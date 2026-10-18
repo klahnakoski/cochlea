@@ -22,7 +22,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## Crisper bars
 
-- Loudness weighting is +4 dB per octave (LOUDNESS_DB_PER_OCTAVE): judge on real music, maybe a real equal-loudness curve
+- Loudness weighting by the ISO 226 equal-loudness contour instead of +4 dB per octave
 - With suppression on, bars drop too fast to see: give every bar a decay from its previous value
 
 ## 5. Harmonic suppression
