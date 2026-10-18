@@ -29,17 +29,50 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(3, 6, 4);
 scene.add(sun);
 
-const bars = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(1, 0.12, 0.12).translate(0.5, 0, 0),
-  new THREE.MeshStandardMaterial(),
-  BINS,
-);
-bars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+// Each bar is a wedge spanning its pitch class's 30°, so width grows with radius
+// and neighbours touch; one turn tall, so columns stack without gaps.
+const HALF_ANGLE = Math.PI / 12;
+// Corner bits: 1 = top, 2 = counter-clockwise side, 4 = outer.
+const FACES = [
+  [4, 5, 6, 7],
+  [0, 1, 2, 3],
+  [1, 3, 5, 7],
+  [0, 2, 4, 6],
+  [0, 1, 4, 5],
+  [2, 3, 6, 7],
+];
+const CORNERS = FACES.flatMap(([a, b, c, d]) => [a, b, c, c, b, d]);
 const angleOf = (bin) => ((bin % 12) / 12) * Math.PI * 2;
 const heightOf = (bin) => (bin / 12) * TURN_HEIGHT;
-for (let bin = 0; bin < BINS; bin++) {
-  bars.setColorAt(bin, new THREE.Color().setHSL((bin % 12) / 12, 0.75, 0.55));
+
+const positions = new Float32Array(BINS * CORNERS.length * 3);
+const colors = new Float32Array(positions.length);
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+function shapeBar(bin, length) {
+  const base = bin * CORNERS.length * 3;
+  CORNERS.forEach((corner, i) => {
+    const angle = angleOf(bin) + (corner & 2 ? HALF_ANGLE : -HALF_ANGLE);
+    const radius = corner & 4 ? RADIUS + length : RADIUS;
+    const y = heightOf(bin) + (corner & 1 ? TURN_HEIGHT / 2 : -TURN_HEIGHT / 2);
+    positions.set([Math.cos(angle) * radius, y, Math.sin(angle) * radius], base + i * 3);
+  });
 }
+
+for (let bin = 0; bin < BINS; bin++) {
+  shapeBar(bin, 1);
+  const color = new THREE.Color().setHSL((bin % 12) / 12, 0.75, 0.55);
+  for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
+}
+// Wedge faces lie on fixed planes, so normals never change with length.
+geometry.computeVertexNormals();
+const bars = new THREE.Mesh(
+  geometry,
+  new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+);
+bars.frustumCulled = false;
 scene.add(bars);
 
 function label(text, angle) {
@@ -112,12 +145,6 @@ function frameValue(at, bin) {
   return data[low * header.bins + bin] * (1 - mix) + data[high * header.bins + bin] * mix;
 }
 
-const matrix = new THREE.Matrix4();
-const rotation = new THREE.Quaternion();
-const position = new THREE.Vector3();
-const scale = new THREE.Vector3();
-const up = new THREE.Vector3(0, 1, 0);
-
 renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - lastRender) / 1000, 0.1);
   lastRender = now;
@@ -126,13 +153,9 @@ renderer.setAnimationLoop((now) => {
   for (let bin = 0; bin < BINS; bin++) {
     const target = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
     levels[bin] = Math.max(target, levels[bin] * decay);
-    const angle = angleOf(bin);
-    rotation.setFromAxisAngle(up, -angle);
-    position.set(Math.cos(angle) * RADIUS, heightOf(bin), Math.sin(angle) * RADIUS);
-    scale.set(Math.max(levels[bin], 0.02) * MAX_LENGTH, 1, 1);
-    bars.setMatrixAt(bin, matrix.compose(position, rotation, scale));
+    shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
   }
-  bars.instanceMatrix.needsUpdate = true;
+  geometry.attributes.position.needsUpdate = true;
   controls.update();
   renderer.render(scene, camera);
 });
