@@ -51,6 +51,20 @@ def test_analyze_stereo(client):
     assert 0 <= values.min() and values.max() == 1
 
 
+def test_analyze_suppress_keeps_wire_format(client):
+    plain = client.post("/analyze", data={"audio": (BytesIO(sine_wav(1)), "a.wav")}).data
+    suppressed = client.post("/analyze?suppress=1", data={"audio": (BytesIO(sine_wav(1)), "a.wav")}).data
+    (length,) = struct.unpack("<I", plain[:4])
+    assert suppressed[: 4 + length] == plain[: 4 + length]
+    frames = numpy.frombuffer(suppressed[4 + length :], dtype="<f4").reshape(60, 96)
+    assert frames[:-5].argmax(axis=1).tolist() == [45] * 55
+
+
+def test_analyze_rejects_unknown_suppress(client):
+    response = client.post("/analyze?suppress=2", data={"audio": (BytesIO(sine_wav(1)), "a.wav")})
+    assert response.status_code == 400
+
+
 def test_analyze_rejects_garbage(client):
     response = client.post("/analyze", data={"audio": (BytesIO(b"not audio"), "a.wav")})
     assert response.status_code == 400

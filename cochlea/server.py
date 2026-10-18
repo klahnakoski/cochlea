@@ -8,11 +8,14 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 from mo_files import File
 from mo_logs import logger
 
-from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, spectrogram
+from cochlea.harmonics import suppress
+from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, magnitude, normalize
 
 WEB = (File(__file__).parent.parent / "web").os_path
 
 app = Flask(__name__, static_folder=None)
+
+SUPPRESS = {"0": lambda linear: linear, "1": suppress}  # ?suppress= value -> magnitude filter
 
 
 def decode(data):
@@ -21,9 +24,10 @@ def decode(data):
     return samples.mean(axis=1), sample_rate, samples.shape[1]
 
 
-def pack(samples, sample_rate):
-    """Analyze mono samples into the /analyze wire format."""
-    hop, frames = spectrogram(samples, sample_rate)
+def pack(samples, sample_rate, shape):
+    """Analyze mono samples into the /analyze wire format; `shape` filters linear magnitude."""
+    hop, linear = magnitude(samples, sample_rate)
+    frames = normalize(shape(linear))
     header = (
         json
         .dumps({
@@ -56,6 +60,9 @@ def analyze():
     upload = request.files.get("audio")
     if upload is None:
         return jsonify(error="missing form field 'audio'"), 400
+    shape = SUPPRESS.get(request.args.get("suppress", "0"))
+    if shape is None:
+        return jsonify(error="suppress must be 0 or 1"), 400
     start = time.monotonic()
     data = upload.read()
     logger.info("analyze: received {file} ({bytes} bytes)", file=upload.filename, bytes=len(data))
@@ -70,7 +77,7 @@ def analyze():
         rate=sample_rate,
         channels=channels,
     )
-    body = pack(mono, sample_rate)
+    body = pack(mono, sample_rate, shape)
     logger.info(
         "analyze: done in {seconds|round(places=1)}s, sending {bytes} bytes",
         seconds=time.monotonic() - start,

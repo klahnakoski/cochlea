@@ -20,11 +20,10 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 
-## 5. Harmonic suppression (agent harmonics)
+## 5. Harmonic suppression
 
-- Prototype script (not the server) comparing methods on test tones and one real recording: (a) harmonic product spectrum baseline; (b) temporal correlation — a bin whose envelope co-varies with the bin 12, 19, 24, 28, 31 semitones below is an overtone, attribute its energy to the lower bin
-- Pick the winner, implement as a server option (?suppress=1), with tests on a tone with synthesized overtones: fundamental stays, 2× and 3× bins drop
-- Toggle in the UI
+- Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
+- Bass bins leak into the semitone above (bins 7.8 Hz apart, 10 Hz minimum half-width): C3 lights C#3 at about 0.5
 
 ## 6. Polish
 

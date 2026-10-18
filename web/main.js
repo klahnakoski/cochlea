@@ -112,10 +112,12 @@ window.addEventListener("resize", () => {
 });
 
 const info = document.getElementById("info");
+const suppress = document.getElementById("suppress");
 const audio = new AudioContext();
 let source = null;
 let startTime = 0;
 let spectrogram = null;
+let currentFile = null;
 
 function stop() {
   if (source) source.stop();
@@ -125,13 +127,14 @@ function stop() {
 async function fetchFrames(file) {
   const form = new FormData();
   form.append("audio", file);
-  const response = await fetch("/analyze", { method: "POST", body: form });
+  const response = await fetch(`/analyze?suppress=${suppress.checked ? 1 : 0}`, { method: "POST", body: form });
   if (!response.ok) throw new Error(`analyze failed: ${response.status}`);
   return parseFrames(await response.arrayBuffer());
 }
 
 async function play(file) {
   info.textContent = "analyzing...";
+  currentFile = file;
   const [frames, buffer] = await Promise.all([
     fetchFrames(file),
     file.arrayBuffer().then((bytes) => audio.decodeAudioData(bytes)),
@@ -174,3 +177,13 @@ document.getElementById("file").addEventListener("change", (event) => {
   if (file) play(file).catch((error) => (info.textContent = String(error)));
 });
 document.getElementById("stop").addEventListener("click", stop);
+// re-analyze the playing file; playback continues, frames swap when they arrive
+suppress.addEventListener("change", () => {
+  if (!currentFile) return;
+  const file = currentFile;
+  fetchFrames(file)
+    .then((frames) => {
+      if (file === currentFile) spectrogram = frames;
+    })
+    .catch((error) => (info.textContent = String(error)));
+});
