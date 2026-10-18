@@ -6,3 +6,4 @@ logs/
 .claude
 logs
 *.egg-info
+.idea/
