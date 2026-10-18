@@ -6,6 +6,9 @@ const TURN_HEIGHT = 1.2;
 const MAX_LENGTH = 4 * TURN_HEIGHT; // a bar at level 1/4 is a cube
 const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
 const LABEL_SIZE = 0.35;
+const DARKEST = 0.25; // bass lightness
+const LIGHTEST = 0.8; // treble lightness
+const OPACITY = 0.6;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -81,14 +84,21 @@ function shapeBar(bin, length) {
 
 for (let bin = 0; bin < BINS; bin++) {
   shapeBar(bin, 1);
-  const color = new THREE.Color().setHSL((bin % 12) / 12, 0.75, 0.55);
+  const lightness = DARKEST + ((LIGHTEST - DARKEST) * bin) / (BINS - 1);
+  const color = new THREE.Color().setHSL((bin % 12) / 12, 0.75, lightness);
   for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
 }
 // Wedge faces lie on fixed planes, so normals never change with length.
 geometry.computeVertexNormals();
 const bars = new THREE.Mesh(
   geometry,
-  new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+  new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: OPACITY,
+    depthWrite: false,
+  }),
 );
 bars.frustumCulled = false;
 helix.add(bars);
