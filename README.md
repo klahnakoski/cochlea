@@ -8,13 +8,45 @@ along its own spiral.
 Analysis is a Fourier transform, followed by correlation across the spectrum to
 suppress each instrument's overtones so the bars show fundamentals, not harmonics.
 
-## Run
+Needs Python 3.10+. Node is optional, for the page's parser test.
+
+## Install
+
+Mac:
 
 ```
+git clone https://github.com/klahnakoski/cochlea.git
+cd cochlea
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+```
+
+Windows (PowerShell):
+
+```
+git clone https://github.com/klahnakoski/cochlea.git
+cd cochlea
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 pip install -e .[dev]
+```
+
+## Run
+
+With the venv active, on either platform:
+
+```
 python -m cochlea
 ```
 
-Open http://localhost:5000, choose an audio file. Test with `pytest`.
+Open http://localhost:5000 and choose an audio file.
+
+## Test
+
+With the venv active, from the repo root:
+
+```
+python -m pytest
+node web/frames.test.mjs
+```

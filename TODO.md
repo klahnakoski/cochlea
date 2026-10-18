@@ -11,10 +11,6 @@ little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
 frame_rate, fmin, bins_per_octave, bins, frames, duration}, then frames × bins
 little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
 
-## README
-
-- Cut-and-paste install/run/test instructions for Mac and Windows
-
 ## 3. Spiral renderer
 
 - Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag spins it; tune decay (0.02^dt) and bar scale in web/main.js (built by an agent with no browser)
