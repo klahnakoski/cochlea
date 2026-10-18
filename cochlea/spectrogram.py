@@ -7,7 +7,8 @@ FMIN = 440.0 * 2 ** (-45 / 12)  # C1
 FREQS = FMIN * 2 ** (numpy.arange(BINS) / BINS_PER_OCTAVE)
 FRAME_RATE = 60
 Q = 30  # resolution of a Q-cycle Hann window; neighbours stay dark
-HALF_WIDTHS = 2 * FREQS / Q  # Hz from each bin's centre to its band edge
+MIN_HALF_WIDTH = 10  # Hz; bass bands this wide so beats stay sharp
+HALF_WIDTHS = numpy.maximum(2 * FREQS / Q, MIN_HALF_WIDTH)  # Hz, centre to band edge
 PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
 FLOOR_DB = 60
 
