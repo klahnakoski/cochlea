@@ -49,7 +49,7 @@ def test_bass_burst_stays_short():
     hop, frames = spectrogram(samples, RATE)
     lit = numpy.flatnonzero(frames[:, bin_of(55)] > 0.5)
     assert lit.min() >= RATE // hop
-    assert (lit.max() - lit.min()) * hop / RATE < 0.3
+    assert (lit.max() - lit.min()) * hop / RATE < 0.35
 
 
 def test_bar_lights_at_attack_and_fades_after():
@@ -59,7 +59,7 @@ def test_bar_lights_at_attack_and_fades_after():
         hop, frames = spectrogram(samples, RATE)
         start, stop = RATE // hop, 2 * RATE // hop
         assert frames[:start, bin_of(freq)].max() == 0, freq
-        assert frames[stop + round(0.35 * RATE / hop) :, bin_of(freq)].max() == 0, freq
+        assert frames[stop + round(0.5 * RATE / hop) :, bin_of(freq)].max() == 0, freq
 
 
 def test_equal_tones_rise_3_db_per_octave():

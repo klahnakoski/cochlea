@@ -12,7 +12,7 @@ TAUS = numpy.minimum(SEMITONE_REJECTION / (2 * numpy.pi * FREQS * (2 ** (1 / 12)
 BAND_EDGE = 4  # 2π·Δf·τ where the band is cut, about 49 dB down
 HALF_WIDTHS = BAND_EDGE / (2 * numpy.pi * TAUS)  # Hz, centre to band edge
 PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
-FLOOR_DB = 30
+FLOOR_DB = 45
 LOUDNESS_DB_PER_OCTAVE = 3  # the ear hears mids louder than bass
 LOUDNESS = 10 ** (LOUDNESS_DB_PER_OCTAVE * numpy.arange(BINS) / BINS_PER_OCTAVE / 20)
 
