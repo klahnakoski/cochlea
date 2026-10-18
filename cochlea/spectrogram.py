@@ -1,6 +1,8 @@
 import numpy
 from mo_logs import logger
 
+from cochlea.loudness import gain_db
+
 BINS_PER_OCTAVE = 12
 BINS = 96
 FMIN = 440.0 * 2 ** (-45 / 12)  # C1
@@ -13,8 +15,8 @@ BAND_EDGE = 4  # 2π·Δf·τ where the band is cut, about 49 dB down
 HALF_WIDTHS = BAND_EDGE / (2 * numpy.pi * TAUS)  # Hz, centre to band edge
 PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
 FLOOR_DB = 45
-LOUDNESS_DB_PER_OCTAVE = 4  # the ear hears mids louder than bass
-LOUDNESS = 10 ** (LOUDNESS_DB_PER_OCTAVE * numpy.arange(BINS) / BINS_PER_OCTAVE / 20)
+PHON = 80  # listening level for the equal-loudness contour
+LOUDNESS = 10 ** (gain_db(FREQS, PHON) / 20)  # weight each bin as loud as the ear hears it
 
 
 def spectrogram(samples, sample_rate):
