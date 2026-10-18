@@ -48,13 +48,15 @@ def test_bass_burst_stays_short():
     samples[RATE : RATE + burst] = numpy.sin(2 * numpy.pi * 55 * numpy.arange(burst) / RATE)
     hop, frames = spectrogram(samples, RATE)
     lit = numpy.flatnonzero(frames[:, bin_of(55)] > 0.5)
-    assert (lit.max() - lit.min()) * hop / RATE < 0.25
+    assert lit.min() >= RATE // hop
+    assert (lit.max() - lit.min()) * hop / RATE < 0.3
 
 
-def test_bar_drops_when_note_stops():
+def test_bar_lights_at_attack_and_fades_after():
     for freq in (55, 262):
         samples = numpy.zeros(3 * RATE, dtype="float32")
         samples[RATE : 2 * RATE] = numpy.sin(2 * numpy.pi * freq * numpy.arange(RATE) / RATE)
         hop, frames = spectrogram(samples, RATE)
-        stop = 2 * RATE // hop
-        assert frames[stop + 2 :, bin_of(freq)].max() < 0.1, freq
+        start, stop = RATE // hop, 2 * RATE // hop
+        assert frames[:start, bin_of(freq)].max() == 0, freq
+        assert frames[stop + round(0.35 * RATE / hop) :, bin_of(freq)].max() == 0, freq

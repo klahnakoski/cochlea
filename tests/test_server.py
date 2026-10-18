@@ -46,8 +46,8 @@ def test_analyze_stereo(client):
     values = numpy.frombuffer(body[4 + length :], dtype="<f4")
     assert values.size == 60 * 96
     frames = values.reshape(60, 96)
-    # last frames look ahead past the end of the file
-    assert frames[:-5].argmax(axis=1).tolist() == [45] * 55
+    # first frames are the attack
+    assert frames[3:].argmax(axis=1).tolist() == [45] * 57
     assert 0 <= values.min() and values.max() == 1
 
 
@@ -57,7 +57,7 @@ def test_analyze_suppress_keeps_wire_format(client):
     (length,) = struct.unpack("<I", plain[:4])
     assert suppressed[: 4 + length] == plain[: 4 + length]
     frames = numpy.frombuffer(suppressed[4 + length :], dtype="<f4").reshape(60, 96)
-    assert frames[:-5].argmax(axis=1).tolist() == [45] * 55
+    assert frames[3:].argmax(axis=1).tolist() == [45] * 57
 
 
 def test_analyze_rejects_unknown_suppress(client):

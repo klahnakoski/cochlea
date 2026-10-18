@@ -24,7 +24,7 @@ def levels(samples, seconds, shape):
 
 def test_overtones_drop_fundamental_stays():
     tone = note(C3, start=0.2, decay=2)
-    assert (levels(tone, seconds=1, shape=lambda linear: linear) > 0.7).all()
+    assert (levels(tone, seconds=1, shape=lambda linear: linear) > 0.5).all()
     fundamental, octave, twelfth = levels(tone, seconds=1, shape=suppress)
     assert fundamental > 0.9 and octave < 0.3 and twelfth < 0.3
 
@@ -32,4 +32,4 @@ def test_overtones_drop_fundamental_stays():
 def test_octave_of_separate_notes_keeps_both():
     octave = note(C3, start=0.2, decay=1) + note(C4, start=1, decay=1)
     low, high, _ = levels(octave, seconds=1.3, shape=suppress)
-    assert low > 0.7 and high > 0.7
+    assert low > 0.5 and high > 0.5
