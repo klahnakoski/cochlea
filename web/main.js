@@ -20,6 +20,8 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 camera.position.set(0, 7, 11);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, (TURN_HEIGHT * 7) / 2, 0);
+controls.maxPolarAngle = Math.PI / 2; // never look from below
+controls.enablePan = false;
 controls.update();
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
