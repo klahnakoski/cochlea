@@ -6,9 +6,10 @@ const TURN_HEIGHT = 1.2;
 const MAX_LENGTH = 4 * TURN_HEIGHT; // a bar at level 1/4 is a cube
 const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
 const LABEL_SIZE = 0.35;
-const DARKEST = 0.25; // bass lightness
-const LIGHTEST = 0.8; // treble lightness
-const OPACITY = 0.6;
+// Bar colours are OKLCH: lightness is perceptual, so equal steps look equal.
+const DARKEST = 0.4; // bass
+const LIGHTEST = 0.9; // treble
+const CHROMA = 0.12;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -63,6 +64,21 @@ const FACES = [
   [2, 3, 6, 7],
 ];
 const CORNERS = FACES.flatMap(([a, b, c, d]) => [a, b, c, c, b, d]);
+// OKLCH to a linear-sRGB colour (Björn Ottosson's OKLab matrices).
+function oklch(lightness, chroma, hue) {
+  const a = chroma * Math.cos(hue);
+  const b = chroma * Math.sin(hue);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const clip = (value) => Math.min(Math.max(value, 0), 1);
+  return new THREE.Color().setRGB(
+    clip(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    clip(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    clip(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+    THREE.LinearSRGBColorSpace,
+  );
+}
 const angleOf = (bin) => ((bin % 12) / 12) * Math.PI * 2;
 const heightOf = (bin) => (bin / 12) * TURN_HEIGHT;
 
@@ -85,20 +101,14 @@ function shapeBar(bin, length) {
 for (let bin = 0; bin < BINS; bin++) {
   shapeBar(bin, 1);
   const lightness = DARKEST + ((LIGHTEST - DARKEST) * bin) / (BINS - 1);
-  const color = new THREE.Color().setHSL((bin % 12) / 12, 0.75, lightness);
+  const color = oklch(lightness, CHROMA, ((bin % 12) / 12) * Math.PI * 2);
   for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
 }
 // Wedge faces lie on fixed planes, so normals never change with length.
 geometry.computeVertexNormals();
 const bars = new THREE.Mesh(
   geometry,
-  new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: OPACITY,
-    depthWrite: false,
-  }),
+  new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide }),
 );
 bars.frustumCulled = false;
 helix.add(bars);
