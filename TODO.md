@@ -5,3 +5,4 @@
 - Fourier transform into 12 bins per octave
 - 3D bar chart wrapped in a spiral, one turn per octave, so each pitch class stacks vertically
 - Correlation analysis to suppress each instrument's overtones so only fundamentals light up
+- Later: click-and-drag to spin the spiral
