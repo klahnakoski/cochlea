@@ -15,7 +15,13 @@ FLOOR_DB = 60
 
 
 def spectrogram(samples, sample_rate):
-    """Return (hop, frames): frames is a (frames, BINS) float32 array in 0..1.
+    """Return (hop, frames): frames is a (frames, BINS) float32 array in 0..1."""
+    hop, linear = magnitude(samples, sample_rate)
+    return hop, normalize(linear)
+
+
+def magnitude(samples, sample_rate):
+    """Return (hop, linear): linear is a (frames, BINS) float32 magnitude array.
 
     One FFT of the whole file feeds every bin: each bin takes a Hann-shaped band
     of that spectrum around its frequency, folds it to the frame grid, and an
@@ -40,7 +46,7 @@ def spectrogram(samples, sample_rate):
     ahead = (numpy.arange(count) + LEADS[:, None]) % total
     envelope = numpy.take_along_axis(envelope, ahead, axis=1)
     logger.info("spectrogram: {frames} frames done", frames=count)
-    return hop, normalize((numpy.abs(envelope) / (hop / 2)).T.astype("float32"))
+    return hop, (numpy.abs(envelope) / (hop / 2)).T.astype("float32")
 
 
 def normalize(magnitude):
