@@ -14,7 +14,6 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 ## 3. Spiral renderer
 
 - Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag spins it; tune decay (0.02^dt) and bar scale in web/main.js (built by an agent with no browser)
-- Spectrogram as one 96-row kernel matrix applied to framed samples (not 96 full-length FFTs), so a song analyzes in seconds
 
 ## 4. Transport
 
