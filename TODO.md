@@ -20,6 +20,11 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 
+## Crisper bars
+
+- Gammatone (order 4, causal) bands instead of Hann, no look-ahead, 30 dB floor
+- With suppression on, bars drop too fast to see: give every bar a decay from its previous value (check after the gammatone change)
+
 ## 5. Harmonic suppression
 
 - Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
