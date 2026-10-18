@@ -16,21 +16,25 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0b12);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 7, 11);
-camera.lookAt(0, (TURN_HEIGHT * 7) / 2, 0);
+const CENTRE = (TURN_HEIGHT * (BINS / 12 - 1)) / 2;
+camera.position.set(0, CENTRE + 5, 11);
+camera.lookAt(0, CENTRE, 0);
 
-// Dragging moves the top of the axis; the base stays put.
+// Dragging tilts the axis about the spiral's centre, so it stays mid-screen.
+const pivot = new THREE.Group();
+pivot.position.y = CENTRE;
+scene.add(pivot);
 const helix = new THREE.Group();
-scene.add(helix);
+helix.position.y = -CENTRE;
+pivot.add(helix);
 const DRAG_RADIANS_PER_PIXEL = 0.005;
-const TILT_TOWARD = Math.PI / 3;
-const TILT_AWAY = Math.PI / 4; // farther would show the bottom
-const TILT_SIDEWAYS = Math.PI / 3;
+const TILT_FORWARD = Math.PI; // far enough to point the axis straight down
+const TILT_SIDEWAYS = Math.PI / 2;
 const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
 renderer.domElement.addEventListener("pointermove", (event) => {
   if (!(event.buttons & 1)) return;
-  helix.rotation.x = clamp(helix.rotation.x + event.movementY * DRAG_RADIANS_PER_PIXEL, -TILT_AWAY, TILT_TOWARD);
-  helix.rotation.z = clamp(helix.rotation.z - event.movementX * DRAG_RADIANS_PER_PIXEL, -TILT_SIDEWAYS, TILT_SIDEWAYS);
+  pivot.rotation.x = clamp(pivot.rotation.x + event.movementY * DRAG_RADIANS_PER_PIXEL, -TILT_FORWARD, TILT_FORWARD);
+  pivot.rotation.z = clamp(pivot.rotation.z - event.movementX * DRAG_RADIANS_PER_PIXEL, -TILT_SIDEWAYS, TILT_SIDEWAYS);
 });
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
