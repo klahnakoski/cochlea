@@ -1,6 +1,6 @@
 import numpy
 
-from cochlea.spectrogram import BINS, FMIN, spectrogram
+from cochlea.spectrogram import BINS, FLOOR_DB, FMIN, spectrogram
 
 RATE = 44100
 
@@ -60,3 +60,10 @@ def test_bar_lights_at_attack_and_fades_after():
         start, stop = RATE // hop, 2 * RATE // hop
         assert frames[:start, bin_of(freq)].max() == 0, freq
         assert frames[stop + round(0.35 * RATE / hop) :, bin_of(freq)].max() == 0, freq
+
+
+def test_equal_tones_rise_3_db_per_octave():
+    c2, c6 = 65.406, 1046.5
+    _, frames = spectrogram(tone(c2, c6), RATE)
+    middle = frames[len(frames) // 2]
+    assert abs((middle[bin_of(c6)] - middle[bin_of(c2)]) * FLOOR_DB - 4 * 3) < 1

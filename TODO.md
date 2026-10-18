@@ -22,7 +22,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## Crisper bars
 
-- Loudness weighting like the ear: start with +3 dB per octave so voice and mid instruments show
+- Loudness weighting is +3 dB per octave (LOUDNESS_DB_PER_OCTAVE): judge on real music, maybe a real equal-loudness curve
 - With suppression on, bars drop too fast to see: give every bar a decay from its previous value
 
 ## 5. Harmonic suppression

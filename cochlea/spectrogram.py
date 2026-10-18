@@ -13,6 +13,8 @@ BAND_EDGE = 4  # 2π·Δf·τ where the band is cut, about 49 dB down
 HALF_WIDTHS = BAND_EDGE / (2 * numpy.pi * TAUS)  # Hz, centre to band edge
 PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
 FLOOR_DB = 30
+LOUDNESS_DB_PER_OCTAVE = 3  # the ear hears mids louder than bass
+LOUDNESS = 10 ** (LOUDNESS_DB_PER_OCTAVE * numpy.arange(BINS) / BINS_PER_OCTAVE / 20)
 
 
 def spectrogram(samples, sample_rate):
@@ -52,7 +54,8 @@ def magnitude(samples, sample_rate):
 
 
 def normalize(magnitude):
-    """Map magnitude to dB below the file's peak, FLOOR_DB..0 -> 0..1."""
+    """Weight magnitude by LOUDNESS, then map dB below the file's peak, FLOOR_DB..0 -> 0..1."""
+    magnitude = magnitude * LOUDNESS
     peak = magnitude.max()
     if peak == 0:
         return numpy.zeros_like(magnitude)
