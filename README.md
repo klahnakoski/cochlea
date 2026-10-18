@@ -7,3 +7,14 @@ along its own spiral.
 
 Analysis is a Fourier transform, followed by correlation across the spectrum to
 suppress each instrument's overtones so the bars show fundamentals, not harmonics.
+
+## Run
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e .[dev]
+python -m cochlea
+```
+
+Open http://localhost:5000, choose an audio file. Test with `pytest`.

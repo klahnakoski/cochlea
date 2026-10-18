@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cochlea</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b12; color: #ddd; font-family: sans-serif; }
+    #ui { position: fixed; top: 8px; left: 8px; z-index: 1; }
+    #info { margin: 6px 0 0; padding: 6px; background: rgba(0, 0, 0, 0.6); font-size: 12px; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <input type="file" id="file" accept="audio/*">
+    <button id="stop">Stop</button>
+    <pre id="info"></pre>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

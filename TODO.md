@@ -6,10 +6,6 @@ plays the file locally via Web Audio and renders. Helix axis is vertical, one tu
 per octave, so each pitch class is a vertical column; bars point radially outward,
 length = magnitude. Analysis is testable on synthesized tones without HTTP.
 
-## 1. Stack
-
-- Set up the stack: Flask server (soundfile decode, numpy analysis) serving a Three.js page; upload a file, get analysis back, play it in the browser (agent stack)
-
 ## 2. Spectrogram endpoint
 
 - Constant-Q spectrogram: 12 bins per octave, C1–C8 (96 bins), via librosa.cqt or a hand-rolled multi-resolution STFT so low notes still resolve to a semitone
