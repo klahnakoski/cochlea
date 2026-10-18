@@ -1,3 +1,5 @@
+import json
+import struct
 from io import BytesIO
 
 import numpy
@@ -5,6 +7,7 @@ import pytest
 import soundfile
 
 from cochlea.server import app, decode
+from cochlea.spectrogram import FMIN
 
 RATE = 44100
 
@@ -26,12 +29,25 @@ def client():
 def test_analyze_stereo(client):
     response = client.post("/analyze", data={"audio": (BytesIO(sine_wav(2)), "a.wav")})
     assert response.status_code == 200
-    assert response.get_json() == {
+    assert response.mimetype == "application/octet-stream"
+    body = response.data
+    (length,) = struct.unpack("<I", body[:4])
+    header = json.loads(body[4 : 4 + length])
+    assert header == {
         "sample_rate": RATE,
-        "channels": 2,
+        "hop": 735,
+        "frame_rate": 60.0,
+        "fmin": FMIN,
+        "bins_per_octave": 12,
+        "bins": 96,
+        "frames": 60,
         "duration": 1.0,
-        "samples": RATE,
     }
+    values = numpy.frombuffer(body[4 + length :], dtype="<f4")
+    assert values.size == 60 * 96
+    frames = values.reshape(60, 96)
+    assert frames.argmax(axis=1).tolist() == [45] * 60
+    assert 0 <= values.min() and values.max() == 1
 
 
 def test_analyze_rejects_garbage(client):

@@ -1,8 +1,12 @@
+import json
+import struct
 from io import BytesIO
 from pathlib import Path
 
 import soundfile
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
+
+from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, spectrogram
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -15,6 +19,26 @@ def decode(data):
         BytesIO(data), dtype="float32", always_2d=True
     )
     return samples.mean(axis=1), sample_rate, samples.shape[1]
+
+
+def pack(samples, sample_rate):
+    """Analyze mono samples into the /analyze wire format."""
+    hop, frames = spectrogram(samples, sample_rate)
+    header = (
+        json
+        .dumps({
+            "sample_rate": sample_rate,
+            "hop": hop,
+            "frame_rate": sample_rate / hop,
+            "fmin": FMIN,
+            "bins_per_octave": BINS_PER_OCTAVE,
+            "bins": BINS,
+            "frames": len(frames),
+            "duration": len(samples) / sample_rate,
+        })
+        .encode("utf-8")
+    )
+    return struct.pack("<I", len(header)) + header + frames.astype("<f4").tobytes()
 
 
 @app.get("/")
@@ -33,12 +57,7 @@ def analyze():
     if upload is None:
         return jsonify(error="missing form field 'audio'"), 400
     try:
-        mono, sample_rate, channels = decode(upload.read())
+        mono, sample_rate, _ = decode(upload.read())
     except Exception as cause:
         return jsonify(error=f"cannot decode audio: {cause}"), 400
-    return jsonify(
-        sample_rate=sample_rate,
-        channels=channels,
-        duration=len(mono) / sample_rate,
-        samples=len(mono),
-    )
+    return Response(pack(mono, sample_rate), mimetype="application/octet-stream")
