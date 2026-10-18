@@ -11,14 +11,10 @@ little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
 frame_rate, fmin, bins_per_octave, bins, frames, duration}, then frames × bins
 little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
 
-## Logging
-
-- Server logs each analysis step: upload, decode, spectrogram progress, response
-
 ## 3. Spiral renderer
 
 - Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag spins it; tune decay (0.02^dt) and bar scale in web/main.js (built by an agent with no browser)
-- Analysis cost: 96 full-length FFTs per file — a multi-minute file takes tens of seconds and hundreds of MB; chunk or downsample per octave if it hurts
+- Spectrogram as one 96-row kernel matrix applied to framed samples (not 96 full-length FFTs), so a song analyzes in seconds
 
 ## 4. Transport
 

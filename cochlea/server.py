@@ -1,10 +1,12 @@
 import json
 import struct
+import time
 from io import BytesIO
 
 import soundfile
 from flask import Flask, Response, jsonify, request, send_from_directory
 from mo_files import File
+from mo_logs import logger
 
 from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, spectrogram
 
@@ -15,9 +17,7 @@ app = Flask(__name__, static_folder=None)
 
 def decode(data):
     """Return (mono float32 samples, sample_rate, channels)."""
-    samples, sample_rate = soundfile.read(
-        BytesIO(data), dtype="float32", always_2d=True
-    )
+    samples, sample_rate = soundfile.read(BytesIO(data), dtype="float32", always_2d=True)
     return samples.mean(axis=1), sample_rate, samples.shape[1]
 
 
@@ -56,8 +56,24 @@ def analyze():
     upload = request.files.get("audio")
     if upload is None:
         return jsonify(error="missing form field 'audio'"), 400
+    start = time.monotonic()
+    data = upload.read()
+    logger.info("analyze: received {file} ({bytes} bytes)", file=upload.filename, bytes=len(data))
     try:
-        mono, sample_rate, _ = decode(upload.read())
+        mono, sample_rate, channels = decode(data)
     except Exception as cause:
+        logger.warning("analyze: cannot decode {file}", file=upload.filename, cause=cause)
         return jsonify(error=f"cannot decode audio: {cause}"), 400
-    return Response(pack(mono, sample_rate), mimetype="application/octet-stream")
+    logger.info(
+        "analyze: decoded {seconds|round(places=1)}s at {rate} Hz, {channels} channels",
+        seconds=len(mono) / sample_rate,
+        rate=sample_rate,
+        channels=channels,
+    )
+    body = pack(mono, sample_rate)
+    logger.info(
+        "analyze: done in {seconds|round(places=1)}s, sending {bytes} bytes",
+        seconds=time.monotonic() - start,
+        bytes=len(body),
+    )
+    return Response(body, mimetype="application/octet-stream")

@@ -1,4 +1,5 @@
 import numpy
+from mo_logs import logger
 
 BINS_PER_OCTAVE = 12
 BINS = 96
@@ -22,17 +23,22 @@ def spectrogram(samples, sample_rate):
     size = 1 << int(numpy.ceil(numpy.log2(len(samples) + 2 * pad + lengths.max())))
     padded = numpy.zeros(size, dtype="complex64")
     padded[pad : pad + len(samples)] = samples
+    logger.info("spectrogram: {samples} samples, FFT size {size}", samples=len(samples), size=size)
     spectrum = numpy.fft.fft(padded)
 
     magnitude = numpy.zeros((count, BINS), dtype="float32")
     centres = numpy.arange(count) * hop + pad
     for k, (freq, length) in enumerate(zip(freqs, lengths)):
         n = numpy.arange(length)
-        window = numpy.hanning(length) * numpy.exp(
-            2j * numpy.pi * freq / sample_rate * n
-        )
+        window = numpy.hanning(length) * numpy.exp(2j * numpy.pi * freq / sample_rate * n)
         correlation = numpy.fft.ifft(spectrum * numpy.conj(numpy.fft.fft(window, size)))
         magnitude[:, k] = numpy.abs(correlation[centres - length // 2]) / (length / 2)
+        if (k + 1) % BINS_PER_OCTAVE == 0:
+            logger.info(
+                "spectrogram: octave {octave} of {octaves} done",
+                octave=(k + 1) // BINS_PER_OCTAVE,
+                octaves=BINS // BINS_PER_OCTAVE,
+            )
     return hop, normalize(magnitude)
 
 
