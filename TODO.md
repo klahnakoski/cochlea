@@ -13,7 +13,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## 3. Spiral renderer
 
-- Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag spins it; tune decay (0.02^dt) and bar scale in web/main.js (built by an agent with no browser)
+- Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag tilts the top of the axis; tune decay (0.02^dt) and bar scale in web/main.js (built by an agent with no browser)
 
 ## 4. Transport
 

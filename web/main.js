@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { parseFrames } from "./frames.js";
 
 const BINS = 96;
@@ -18,11 +17,21 @@ scene.background = new THREE.Color(0x0b0b12);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 7, 11);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, (TURN_HEIGHT * 7) / 2, 0);
-controls.maxPolarAngle = Math.PI / 2; // never look from below
-controls.enablePan = false;
-controls.update();
+camera.lookAt(0, (TURN_HEIGHT * 7) / 2, 0);
+
+// Dragging moves the top of the axis; the base stays put.
+const helix = new THREE.Group();
+scene.add(helix);
+const DRAG_RADIANS_PER_PIXEL = 0.005;
+const TILT_TOWARD = Math.PI / 3;
+const TILT_AWAY = Math.PI / 4; // farther would show the bottom
+const TILT_SIDEWAYS = Math.PI / 3;
+const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
+renderer.domElement.addEventListener("pointermove", (event) => {
+  if (!(event.buttons & 1)) return;
+  helix.rotation.x = clamp(helix.rotation.x + event.movementY * DRAG_RADIANS_PER_PIXEL, -TILT_AWAY, TILT_TOWARD);
+  helix.rotation.z = clamp(helix.rotation.z - event.movementX * DRAG_RADIANS_PER_PIXEL, -TILT_SIDEWAYS, TILT_SIDEWAYS);
+});
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -73,7 +82,7 @@ const bars = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide }),
 );
 bars.frustumCulled = false;
-scene.add(bars);
+helix.add(bars);
 
 function label(text, angle) {
   const canvas = document.createElement("canvas");
@@ -86,7 +95,7 @@ function label(text, angle) {
   context.fillText(text, 32, 32);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) }));
   sprite.position.set(Math.cos(angle) * (RADIUS - 0.5), 0, Math.sin(angle) * (RADIUS - 0.5));
-  scene.add(sprite);
+  helix.add(sprite);
 }
 NOTE_NAMES.forEach((name, pitch) => label(name, angleOf(pitch)));
 
@@ -156,7 +165,6 @@ renderer.setAnimationLoop((now) => {
     shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
   }
   geometry.attributes.position.needsUpdate = true;
-  controls.update();
   renderer.render(scene, camera);
 });
 
