@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { parseFrames } from "./frames.js";
 
 const BINS = 96;
-const MAX_LENGTH = 2;
 const TURN_HEIGHT = 1.2;
+const MAX_LENGTH = 4 * TURN_HEIGHT; // a bar at level 1/4 is a cube
 const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
 const LABEL_SIZE = 0.35;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
