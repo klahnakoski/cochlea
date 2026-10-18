@@ -27,6 +27,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## 5. Harmonic suppression
 
+- A fundamental in octave n (C1 = 1) claims only its first n overtones; loudness +4 dB per octave
 - Suppression over-claims on bass-heavy music: on a dance track it cuts mean level in octaves C3..C7 from 0.22 to 0.04, so voice vanishes; bass/kick energy is taken as the fundamental of everything above
 - Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
 - Bass bins leak into the semitone above (bins 7.8 Hz apart, gammatone τ capped at 0.04 s): C3 lights C#3 at about 0.5
