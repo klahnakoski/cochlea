@@ -17,8 +17,13 @@ scene.background = new THREE.Color(0x0b0b12);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
 const CENTRE = (TURN_HEIGHT * (BINS / 12 - 1)) / 2;
-camera.position.set(0, CENTRE + 5, 11);
-camera.lookAt(0, CENTRE, 0);
+const VIEW = new THREE.Vector3(0, 5, 11); // camera offset from the centre at zoom 1
+function zoom(factor) {
+  camera.position.set(0, CENTRE, 0).addScaledVector(VIEW, factor);
+  camera.lookAt(0, CENTRE, 0);
+}
+zoom(1);
+document.getElementById("zoom").addEventListener("input", (event) => zoom(Number(event.target.value)));
 
 // Dragging tilts the axis about the spiral's centre, so it stays mid-screen.
 const pivot = new THREE.Group();
