@@ -6,14 +6,19 @@ plays the file locally via Web Audio and renders. Helix axis is vertical, one tu
 per octave, so each pitch class is a vertical column; bars point radially outward,
 length = magnitude. Analysis is testable on synthesized tones without HTTP.
 
-## 2. Spectrogram endpoint
+Wire format of POST /analyze (field `audio`), shared by stages 2 and 3: body is a
+little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
+frame_rate, fmin, bins_per_octave, bins, frames, duration}, then frames × bins
+little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
+
+## 2. Spectrogram endpoint (agent spectrogram)
 
 - Constant-Q spectrogram: 12 bins per octave, C1–C8 (96 bins), via librosa.cqt or a hand-rolled multi-resolution STFT so low notes still resolve to a semitone
 - Frame rate ~60/s (hop chosen from the sample rate); magnitude → dB → normalize to 0..1 per file
 - Return frames as binary float32 (frames × bins) with a small JSON header (sample_rate, hop, bins, fmin) instead of JSON arrays
 - Tests: a synthesized 440 Hz tone lights the A4 bin and little else; a C-major chord lights three bins; silence is all zeros
 
-## 3. Spiral renderer
+## 3. Spiral renderer (agent renderer)
 
 - Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, drag spins the ring (built by an agent with no browser)
 - Fetch frames and decode the same file locally; start playback from an AudioBufferSourceNode
