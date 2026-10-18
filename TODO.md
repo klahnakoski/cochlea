@@ -20,7 +20,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 
-## 5. Harmonic suppression
+## 5. Harmonic suppression (agent harmonics)
 
 - Prototype script (not the server) comparing methods on test tones and one real recording: (a) harmonic product spectrum baseline; (b) temporal correlation — a bin whose envelope co-varies with the bin 12, 19, 24, 28, 31 semitones below is an overtone, attribute its energy to the lower bin
 - Pick the winner, implement as a server option (?suppress=1), with tests on a tone with synthesized overtones: fundamental stays, 2× and 3× bins drop
