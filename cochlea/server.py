@@ -11,7 +11,9 @@ app = Flask(__name__, static_folder=None)
 
 def decode(data):
     """Return (mono float32 samples, sample_rate, channels)."""
-    samples, sample_rate = soundfile.read(BytesIO(data), dtype="float32", always_2d=True)
+    samples, sample_rate = soundfile.read(
+        BytesIO(data), dtype="float32", always_2d=True
+    )
     return samples.mean(axis=1), sample_rate, samples.shape[1]
 
 
