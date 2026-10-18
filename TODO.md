@@ -15,6 +15,7 @@ length = magnitude. Analysis is testable on synthesized tones without HTTP.
 
 ## 3. Spiral renderer
 
+- Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, drag spins the ring (built by an agent with no browser)
 - Fetch frames and decode the same file locally; start playback from an AudioBufferSourceNode
 - Helix of 96 bars as one InstancedMesh: angle = 2π·(semitone/12), height = semitone/12 turns, bar length driven by the frame
 - Per render: t = audioContext.currentTime − startTime + outputLatency; pick the frame at t, lerp between neighbours, decay bars so they fall smoothly
