@@ -1,10 +1,15 @@
 import numpy
 
+from cochlea.spectrogram import BINS, BINS_PER_OCTAVE
+
 OFFSETS = numpy.round(12 * numpy.log2(numpy.arange(2, 11))).astype(int)  # 12 19 24 28 31 34 36 38 40
 PRODUCT_OFFSETS = numpy.concatenate([[0], OFFSETS[:4]])  # partials 1..5 make a bin's salience
 AUDIBLE = 0.1  # a fundamental within 20 dB of its overtone
 CAP = 0.7  # an overtone louder than this times its fundamental keeps the excess
 SALIENCE_FLOOR = 1e-3
+# A fundamental in octave n (C1 = 1) claims only its first n overtones; bass has fewest.
+FUNDAMENTALS = numpy.arange(BINS)[:, None] - OFFSETS  # (overtone bin, offset) -> fundamental bin
+CLAIMABLE = (FUNDAMENTALS >= 0) & (numpy.arange(len(OFFSETS)) < FUNDAMENTALS // BINS_PER_OCTAVE + 1)
 
 
 def suppress(linear):
@@ -17,7 +22,7 @@ def suppress(linear):
         numpy.log(above(linear, PRODUCT_OFFSETS, floor=linear.max() * SALIENCE_FLOOR + 1e-30)).mean(axis=2)
     )
     fundamentals = below(linear, OFFSETS)
-    rivals = below(salience, OFFSETS) * (fundamentals > AUDIBLE * linear[:, :, None])
+    rivals = below(salience, OFFSETS) * (fundamentals > AUDIBLE * linear[:, :, None]) * CLAIMABLE
     choice = rivals.argmax(axis=2)
     beaten = pick(rivals, choice) > salience
     moved = numpy.where(beaten, numpy.minimum(linear, CAP * pick(fundamentals, choice)), 0)

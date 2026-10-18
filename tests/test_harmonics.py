@@ -33,3 +33,11 @@ def test_octave_of_separate_notes_keeps_both():
     octave = note(C3, start=0.2, decay=1) + note(C4, start=1, decay=1)
     low, high, _ = levels(octave, seconds=1.3, shape=suppress)
     assert low > 0.5 and high > 0.5
+
+
+def test_bass_claims_only_its_first_overtone():
+    c1, c2, g2 = 0, 12, 19
+    _, linear = magnitude(note(c1, start=0.2, decay=2).astype("float32"), RATE)
+    plain, suppressed = normalize(linear)[60], normalize(suppress(linear))[60]
+    assert plain[c2] > 0.5 and plain[g2] > 0.5
+    assert suppressed[c2] < 0.3 and suppressed[g2] > 0.5
