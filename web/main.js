@@ -2,9 +2,10 @@ import * as THREE from "three";
 import { parseFrames } from "./frames.js";
 
 const BINS = 96;
-const RADIUS = 3;
 const MAX_LENGTH = 2;
 const TURN_HEIGHT = 0.6;
+const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
+const LABEL_SIZE = 0.35;
 const DECAY_PER_SECOND = 0.02;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -94,7 +95,9 @@ function label(text, angle) {
   context.textBaseline = "middle";
   context.fillText(text, 32, 32);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) }));
-  sprite.position.set(Math.cos(angle) * (RADIUS - 0.5), 0, Math.sin(angle) * (RADIUS - 0.5));
+  sprite.scale.setScalar(LABEL_SIZE);
+  const radius = RADIUS + LABEL_SIZE;
+  sprite.position.set(Math.cos(angle) * radius, -TURN_HEIGHT, Math.sin(angle) * radius);
   helix.add(sprite);
 }
 NOTE_NAMES.forEach((name, pitch) => label(name, angleOf(pitch)));
