@@ -9,6 +9,7 @@ FRAME_RATE = 60
 Q = 30  # resolution of a Q-cycle Hann window; neighbours stay dark
 MIN_HALF_WIDTH = 10  # Hz; bass bands this wide so beats stay sharp
 HALF_WIDTHS = numpy.maximum(2 * FREQS / Q, MIN_HALF_WIDTH)  # Hz, centre to band edge
+LEADS = numpy.round(FRAME_RATE / HALF_WIDTHS).astype(int)  # frames from kernel centre to edge
 PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
 FLOOR_DB = 60
 
@@ -18,7 +19,8 @@ def spectrogram(samples, sample_rate):
 
     One FFT of the whole file feeds every bin: each bin takes a Hann-shaped band
     of that spectrum around its frequency, folds it to the frame grid, and an
-    inverse FFT gives its envelope at every frame centre.
+    inverse FFT gives its envelope at every frame. Each bin looks ahead: frame t
+    sees sound from t onward, so a bar drops as soon as its note stops.
     """
     hop = round(sample_rate / FRAME_RATE)
     count = -(-len(samples) // hop)
@@ -34,7 +36,9 @@ def spectrogram(samples, sample_rate):
     response = numpy.where(numpy.abs(offset) < 1, 0.5 + 0.5 * numpy.cos(numpy.pi * offset), 0)
     band = spectrum[index.clip(0, len(spectrum) - 1)] * response
     folded = band.reshape(BINS, fold, total).sum(axis=1)
-    envelope = numpy.fft.ifft(folded, axis=1)[:, :count]
+    envelope = numpy.fft.ifft(folded, axis=1)
+    ahead = (numpy.arange(count) + LEADS[:, None]) % total
+    envelope = numpy.take_along_axis(envelope, ahead, axis=1)
     logger.info("spectrogram: {frames} frames done", frames=count)
     return hop, normalize((numpy.abs(envelope) / (hop / 2)).T.astype("float32"))
 

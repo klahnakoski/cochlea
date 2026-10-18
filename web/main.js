@@ -6,7 +6,6 @@ const MAX_LENGTH = 2;
 const TURN_HEIGHT = 0.6;
 const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
 const LABEL_SIZE = 0.35;
-const DECAY_PER_SECOND = 0.02;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -113,8 +112,6 @@ const audio = new AudioContext();
 let source = null;
 let startTime = 0;
 let spectrogram = null;
-const levels = new Float32Array(BINS);
-let lastRender = 0;
 
 function stop() {
   if (source) source.stop();
@@ -157,15 +154,12 @@ function frameValue(at, bin) {
   return data[low * header.bins + bin] * (1 - mix) + data[high * header.bins + bin] * mix;
 }
 
-renderer.setAnimationLoop((now) => {
-  const dt = Math.min((now - lastRender) / 1000, 0.1);
-  lastRender = now;
-  const decay = Math.pow(DECAY_PER_SECOND, dt);
-  const t = audio.currentTime - startTime + (audio.outputLatency || 0);
+renderer.setAnimationLoop(() => {
+  // what the speaker plays now left the context outputLatency ago
+  const t = audio.currentTime - startTime - (audio.outputLatency || 0);
   for (let bin = 0; bin < BINS; bin++) {
-    const target = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
-    levels[bin] = Math.max(target, levels[bin] * decay);
-    shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
+    const level = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
+    shapeBar(bin, Math.max(level, 0.02) * MAX_LENGTH);
   }
   geometry.attributes.position.needsUpdate = true;
   renderer.render(scene, camera);
