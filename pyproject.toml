@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cochlea"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["flask", "numpy", "soundfile"]
+dependencies = ["flask", "mo-files", "mo-logs", "numpy", "soundfile"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

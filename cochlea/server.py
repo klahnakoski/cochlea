@@ -1,14 +1,14 @@
 import json
 import struct
 from io import BytesIO
-from pathlib import Path
 
 import soundfile
 from flask import Flask, Response, jsonify, request, send_from_directory
+from mo_files import File
 
 from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, spectrogram
 
-WEB = Path(__file__).resolve().parent.parent / "web"
+WEB = (File(__file__).parent.parent / "web").os_path
 
 app = Flask(__name__, static_folder=None)
 
