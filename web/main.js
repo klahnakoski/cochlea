@@ -216,9 +216,12 @@ const suppress = document.getElementById("suppress");
 const view = document.getElementById("view");
 // Hits derives from the energy frames in the page; Top notes and Notes are their own analyses
 const serverView = () => (view.value === "hits" ? "energy" : view.value);
+const seek = document.getElementById("seek");
+const clockLabel = document.getElementById("clock");
 const audio = new AudioContext();
 let source = null;
 let startTime = 0;
+let buffer = null;
 let spectrogram = null;
 let currentFile = null;
 
@@ -226,6 +229,18 @@ function stop() {
   if (source) source.stop();
   source = null;
 }
+
+// The context clock freezes while suspended, so startTime stays valid across pauses.
+function startAt(offset) {
+  stop();
+  source = audio.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audio.destination);
+  startTime = audio.currentTime - offset;
+  source.start(0, offset);
+}
+
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
 async function fetchFrames(file) {
   const form = new FormData();
@@ -248,19 +263,16 @@ function describe(file, header) {
 async function play(file) {
   info.textContent = "analyzing...";
   currentFile = file;
-  const [frames, buffer] = await Promise.all([
+  const [frames, decoded] = await Promise.all([
     fetchFrames(file),
     file.arrayBuffer().then((bytes) => audio.decodeAudioData(bytes)),
   ]);
   await audio.resume();
-  stop();
+  buffer = decoded;
+  seek.max = buffer.duration;
   spectrogram = withHits(frames);
   describe(file, frames.header);
-  source = audio.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audio.destination);
-  startTime = audio.currentTime;
-  source.start(startTime);
+  startAt(0);
 }
 
 // Hits view: a bar jumps when its note starts, then decays e^(-t/τ).
@@ -325,6 +337,11 @@ renderer.setAnimationLoop(() => {
     }
   }
   geometry.attributes.position.needsUpdate = true;
+  if (buffer && !seeking) {
+    const position = Math.min(Math.max(audio.currentTime - startTime, 0), buffer.duration);
+    seek.value = position;
+    clockLabel.textContent = `${clock(position)} / ${clock(buffer.duration)}`;
+  }
   flash = source && t >= 0 ? flashAt(t) : 0;
   flashRing.material.opacity = flash;
   renderer.render(scene, camera);
@@ -336,6 +353,16 @@ document.getElementById("file").addEventListener("change", (event) => {
   if (file) play(file).catch((error) => (info.textContent = String(error)));
 });
 document.getElementById("stop").addEventListener("click", stop);
+document.getElementById("pause").addEventListener("click", () => audio.suspend());
+document.getElementById("resume").addEventListener("click", () => audio.resume());
+let seeking = false;
+seek.addEventListener("pointerdown", () => (seeking = true));
+seek.addEventListener("pointerup", () => (seeking = false));
+seek.addEventListener("input", () => {
+  if (!buffer) return;
+  startAt(Number(seek.value));
+  clockLabel.textContent = `${clock(Number(seek.value))} / ${clock(buffer.duration)}`;
+});
 
 // The server's music folder, offered on load.
 const track = document.getElementById("track");
