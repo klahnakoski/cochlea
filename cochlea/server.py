@@ -1,4 +1,5 @@
 import json
+import os
 import struct
 import time
 from io import BytesIO
@@ -14,6 +15,11 @@ from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, emphasize, magnitud
 from cochlea.voices import top
 
 WEB = (File(__file__).parent.parent / "web").os_path
+# tracks the page offers on load; COCHLEA_MUSIC overrides
+MUSIC = File(os.path.expanduser(os.environ.get(
+    "COCHLEA_MUSIC", "~/Music/Chris Sheppard - Pirate Radio Sessions Volume 4"
+)))
+AUDIO = {"wav", "flac", "mp3", "ogg"}
 
 app = Flask(__name__, static_folder=None)
 
@@ -62,6 +68,16 @@ def pack(samples, sample_rate, shape, view):
 @app.get("/")
 def index():
     return send_from_directory(WEB, "index.html")
+
+
+@app.get("/tracks")
+def tracks():
+    return jsonify(sorted(f.name for f in MUSIC.children if f.extension.lower() in AUDIO))
+
+
+@app.get("/tracks/<name>")
+def track(name):
+    return send_from_directory(MUSIC.os_path, name)
 
 
 @app.get("/<path:path>")

@@ -312,6 +312,22 @@ document.getElementById("file").addEventListener("change", (event) => {
   if (file) play(file).catch((error) => (info.textContent = String(error)));
 });
 document.getElementById("stop").addEventListener("click", stop);
+
+// The server's music folder, offered on load.
+const track = document.getElementById("track");
+fetch("/tracks")
+  .then((response) => response.json())
+  .then((names) => track.replaceChildren(...names.map((name) => new Option(name))))
+  .catch((error) => (info.textContent = String(error)));
+document.getElementById("play").addEventListener("click", () => {
+  const name = track.value;
+  if (!name) return;
+  info.textContent = "loading...";
+  fetch(`/tracks/${encodeURIComponent(name)}`)
+    .then((response) => response.blob())
+    .then((blob) => play(new File([blob], name)))
+    .catch((error) => (info.textContent = String(error)));
+});
 // re-analyze the playing file; playback continues, frames swap when they arrive
 function reanalyze() {
   if (!currentFile) return;

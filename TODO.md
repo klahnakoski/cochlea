@@ -16,7 +16,6 @@ voices' keys, the rest 0). Content-Type application/octet-stream.
 
 ## 4. Transport
 
-- Page loads with the tracks of a default music folder (~/Music/Chris Sheppard - Pirate Radio Sessions Volume 4) in a picker
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 

@@ -6,6 +6,9 @@ import numpy
 import pytest
 import soundfile
 
+from mo_files import File
+
+from cochlea import server
 from cochlea.server import app, decode
 from cochlea.spectrogram import FMIN
 
@@ -110,3 +113,12 @@ def test_analyze_top_reports_voices(client):
 def test_analyze_rejects_unknown_view(client):
     response = client.post("/analyze?view=hits", data={"audio": (BytesIO(sine_wav(1)), "a.wav")})
     assert response.status_code == 400
+
+
+def test_tracks_lists_and_serves_the_music_folder(client, tmp_path, monkeypatch):
+    (tmp_path / "b.wav").write_bytes(sine_wav(1))
+    (tmp_path / "a.flac").write_bytes(b"x")
+    (tmp_path / "notes.txt").write_text("not audio")
+    monkeypatch.setattr(server, "MUSIC", File(str(tmp_path)))
+    assert client.get("/tracks").json == ["a.flac", "b.wav"]
+    assert client.get("/tracks/b.wav").data == sine_wav(1)
