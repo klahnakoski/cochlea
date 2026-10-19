@@ -1,7 +1,7 @@
 """Chart the Notes view on test windows of a song, and time it on the whole song.
 
 Run from the repo root: python -m scripts.rectangles [song.wav [chart folder]]
-Writes charts/rect-<window>.png panels: image | beat mask | fitted rectangles | after overtone folding;
+Writes charts/rect-<window>.png panels: image | known pixels (beats black) | fitted rectangles | after overtone folding;
 held rectangles white, the voice pass amber.
 """
 
@@ -95,7 +95,7 @@ def chart(song, output, name, first, last):
     zero = numpy.zeros_like(step["grey"])
     panels = [
         (step["grey"], zero),
-        (numpy.where(step["known"], 0, step["grey"]), zero),
+        (numpy.where(step["known"], step["grey"], 0), zero),
         (fitted["held"], fitted["voice"]),
         (kept["held"], kept["voice"]),
     ]

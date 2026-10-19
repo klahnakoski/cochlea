@@ -19,7 +19,6 @@ lights each fitted rectangle's key at its loudness, the rest 0, ignoring suppres
 
 ## 4. Transport
 
-- Beat-mask panel in scripts/rectangles.py shows known pixels, masked black
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 
