@@ -19,7 +19,7 @@ lights each fitted rectangle's key at its loudness, the rest 0, ignoring suppres
 
 ## 4. Transport
 
-- Play / pause / seek with a progress bar; file name and duration shown
+- Play / pause / seek with a progress bar; file name and duration shown (agent transport)
 - Drop a file anywhere on the page as well as the picker
 
 ## 5. Harmonic suppression
