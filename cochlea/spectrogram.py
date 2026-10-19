@@ -25,7 +25,8 @@ FREQS, TAUS = grid(BINS_PER_OCTAVE)
 BINS = len(FREQS)
 FLOOR_DB = 45
 PHON = 80  # listening level for the equal-loudness contour
-LOUDNESS = 10 ** (gain_db(FREQS, PHON) / 20)  # weight each bin as loud as the ear hears it
+FLAT_BELOW = FMIN * 4  # C3: below it, keep C3's weight so bass outweighs its own octave
+LOUDNESS = 10 ** (gain_db(numpy.maximum(FREQS, FLAT_BELOW), PHON) / 20)  # weight each bin as loud as the ear hears it
 
 
 def spectrogram(samples, sample_rate):

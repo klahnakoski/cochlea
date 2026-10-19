@@ -64,12 +64,21 @@ def test_bass_notes_light_their_bar_after_each_attack():
 
 
 def test_equal_tones_follow_equal_loudness():
-    c2, c3, c5, c6 = 65.406, 130.81, 523.25, 1046.5
-    _, frames = spectrogram(tone(c2, c3, c5, c6), RATE)
+    c2, c3, c4, c5, c6 = 65.406, 130.81, 261.63, 523.25, 1046.5
+    _, frames = spectrogram(tone(c2, c3, c4, c5, c6), RATE)
     db = frames[len(frames) // 2] * FLOOR_DB
-    bass_step = db[bin_of(c3)] - db[bin_of(c2)]
-    mid_step = db[bin_of(c6)] - db[bin_of(c5)]
-    assert bass_step > 5 and abs(mid_step) < 2
+    below_c3 = db[bin_of(c3)] - db[bin_of(c2)]
+    low_mid = db[bin_of(c4)] - db[bin_of(c3)]
+    high_mid = db[bin_of(c6)] - db[bin_of(c5)]
+    assert abs(below_c3) < 1 and low_mid > 3 and abs(high_mid) < 2
+
+
+def test_bass_note_outshines_its_octave():
+    c1 = 32.703
+    samples = tone(c1) + 0.5 * tone(2 * c1)  # 2nd harmonic 6 dB down
+    _, frames = spectrogram(samples, RATE)
+    middle = frames[len(frames) // 2]
+    assert middle[bin_of(c1)] > middle[bin_of(2 * c1)]
 
 
 def test_finer_grid_centres_each_bar_and_rejects_neighbours_alike():
