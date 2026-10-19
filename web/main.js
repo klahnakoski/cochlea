@@ -117,6 +117,32 @@ const bars = new THREE.Mesh(
 bars.frustumCulled = false;
 helix.add(bars);
 
+// A kick flashes a ring at the spiral's base and a band across the chart's bottom.
+const FLASH_SECONDS = 0.1;
+const flashRing = new THREE.Mesh(
+  new THREE.RingGeometry(RADIUS - 0.15, RADIUS + 0.5, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide }),
+);
+flashRing.rotation.x = Math.PI / 2;
+flashRing.position.y = -TURN_HEIGHT / 2;
+helix.add(flashRing);
+
+// Brightness 0..1 at time t: the latest hit's level, fading linearly.
+function flashAt(t) {
+  const { frame, level } = spectrogram.header.drums;
+  const now = t * spectrogram.header.frame_rate;
+  let low = 0;
+  let high = frame.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (frame[middle] <= now) low = middle + 1;
+    else high = middle;
+  }
+  if (low === 0) return 0;
+  const age = (now - frame[low - 1]) / spectrogram.header.frame_rate;
+  return Math.max(0, 1 - age / FLASH_SECONDS) * level[low - 1];
+}
+
 function label(text, angle) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 64;
@@ -143,6 +169,7 @@ function sizeStrip() {
 }
 sizeStrip();
 const levels = new Float32Array(BINS);
+let flash = 0;
 function drawStrip() {
   const { width, height } = strip;
   const barWidth = width / BINS;
@@ -164,6 +191,8 @@ function drawStrip() {
     stripContext.fillStyle = barStyles[bin];
     stripContext.fillRect(bin * barWidth, height - labelHeight - barHeight, barWidth, barHeight);
   });
+  stripContext.fillStyle = `rgba(255, 255, 255, ${flash})`;
+  stripContext.fillRect(0, height - labelHeight, width, labelHeight);
 }
 
 window.addEventListener("resize", () => {
@@ -231,6 +260,8 @@ renderer.setAnimationLoop(() => {
     shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
   }
   geometry.attributes.position.needsUpdate = true;
+  flash = source && t >= 0 ? flashAt(t) : 0;
+  flashRing.material.opacity = flash;
   renderer.render(scene, camera);
   drawStrip();
 });
