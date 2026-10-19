@@ -243,15 +243,18 @@ async function play(file) {
 }
 
 // Hits view: a bar jumps when its note starts, then decays e^(-t/τ).
-const HIT_RISE = 0.07; // level gain over RISE_FRAMES that counts as a note start (~3 dB)
-const RISE_FRAMES = 3; // attacks take a few frames to rise
+const HIT_RISE = 0.07; // level gain over a bar's rise time that counts as a note start (~3 dB)
 const HIT_GAP_SECONDS = 0.1; // vibrato must not retrigger a bar
-const HIT_DECAY_SECONDS = 0.08;
+const BASS_DECAY_SECONDS = 0.5; // C1's decay; halves every two octaves up
 const SUSTAIN = 0.05; // held notes stay faintly visible
+const FILTER_CYCLES = 5.75; // the server's gammatone τ is this many periods (2.15 / 2π·semitone)
 function withHits(frames) {
   const { header, data } = frames;
-  const { bins, frame_rate } = header;
-  const fade = Math.exp(-1 / (frame_rate * HIT_DECAY_SECONDS));
+  const { bins, frame_rate, fmin, bins_per_octave } = header;
+  const octaves = Array.from({ length: bins }, (_, bin) => bin / bins_per_octave);
+  const fades = octaves.map((octave) => Math.exp(-1 / (frame_rate * BASS_DECAY_SECONDS * 2 ** (-octave / 2))));
+  // bass filters respond slowly, so their attacks rise over more frames
+  const rises = octaves.map((octave) => Math.max(3, Math.round((2 * FILTER_CYCLES * frame_rate) / (fmin * 2 ** octave))));
   const gap = Math.round(HIT_GAP_SECONDS * frame_rate);
   const hits = new Float32Array(data.length);
   const lastHit = new Int32Array(bins).fill(-gap);
@@ -259,10 +262,10 @@ function withHits(frames) {
     for (let bin = 0; bin < bins; bin++) {
       const i = frame * bins + bin;
       const level = data[i];
-      const before = frame >= RISE_FRAMES ? data[i - RISE_FRAMES * bins] : 0;
+      const before = frame >= rises[bin] ? data[i - rises[bin] * bins] : 0;
       const struck = level - before > HIT_RISE && frame - lastHit[bin] >= gap;
       if (struck) lastHit[bin] = frame;
-      const decayed = frame ? hits[i - bins] * fade : 0;
+      const decayed = frame ? hits[i - bins] * fades[bin] : 0;
       hits[i] = Math.max(struck ? level : 0, decayed, SUSTAIN * level);
     }
   }
