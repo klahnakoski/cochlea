@@ -205,8 +205,8 @@ window.addEventListener("resize", () => {
 const info = document.getElementById("info");
 const suppress = document.getElementById("suppress");
 const view = document.getElementById("view");
-// Hits derives from the energy frames in the page; Top notes is its own analysis
-const serverView = () => (view.value === "top" ? "top" : "energy");
+// Hits derives from the energy frames in the page; Top notes and Notes are their own analyses
+const serverView = () => (view.value === "hits" ? "energy" : view.value);
 const audio = new AudioContext();
 let source = null;
 let startTime = 0;
@@ -230,7 +230,9 @@ async function fetchFrames(file) {
 function describe(file, header) {
   const seconds = Math.round(header.duration);
   const voices = header.voices ? ` — ${header.voices} voices` : "";
-  info.textContent = `${file.name} — ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}${voices}`;
+  const rectangles = header.rectangles ? ` — ${header.rectangles} rectangles` : "";
+  const length = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  info.textContent = `${file.name} — ${length}${voices}${rectangles}`;
 }
 
 async function play(file) {

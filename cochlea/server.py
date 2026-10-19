@@ -11,6 +11,7 @@ from mo_logs import logger
 
 from cochlea.drums import kicks
 from cochlea.harmonics import suppress
+from cochlea.notes import notes
 from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, emphasize, magnitude, normalize
 from cochlea.voices import top
 
@@ -31,7 +32,11 @@ def top_notes(levels, samples, sample_rate):
     return lit, {"voices": voices}
 
 
-VIEWS = {"energy": lambda levels, samples, sample_rate: (levels, {}), "top": top_notes}  # ?view= -> (levels, header)
+VIEWS = {  # ?view= -> (levels, header)
+    "energy": lambda levels, samples, sample_rate: (levels, {}),
+    "top": top_notes,
+    "notes": notes,
+}
 
 
 def decode(data):
@@ -95,7 +100,7 @@ def analyze():
         return jsonify(error="suppress must be 0 or 1"), 400
     view = VIEWS.get(request.args.get("view", "energy"))
     if view is None:
-        return jsonify(error="view must be energy or top"), 400
+        return jsonify(error="view must be energy, top or notes"), 400
     start = time.monotonic()
     data = upload.read()
     logger.info("analyze: received {file} ({bytes} bytes)", file=upload.filename, bytes=len(data))
