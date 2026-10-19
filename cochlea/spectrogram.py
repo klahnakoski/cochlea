@@ -8,7 +8,8 @@ OCTAVES = 8
 FMIN = 440.0 * 2 ** (-45 / 12)  # C1
 FRAME_RATE = 60
 NEIGHBOUR_REJECTION = 2.15  # 2π·Δf·τ at the neighbouring bin: it sits 30 dB down
-MAX_TAU = 0.04  # seconds per bin per semitone; caps bass decay so beats stay sharp
+LEAD = 3  # τ each bin is read ahead: the gammatone's peak delay
+TAIL = 12  # τ of silence after the end, so circular wrap stays quiet
 BAND_EDGE = 4  # 2π·Δf·τ where the band is cut, about 49 dB down
 
 
@@ -17,12 +18,11 @@ def grid(bins_per_octave):
     split = bins_per_octave // BINS_PER_OCTAVE
     freqs = FMIN * 2 ** ((numpy.arange(OCTAVES * bins_per_octave) - (split - 1) / 2) / bins_per_octave)
     spacing = 2 ** (1 / bins_per_octave) - 1
-    return freqs, numpy.minimum(NEIGHBOUR_REJECTION / (2 * numpy.pi * freqs * spacing), MAX_TAU * split)
+    return freqs, NEIGHBOUR_REJECTION / (2 * numpy.pi * freqs * spacing)
 
 
 FREQS, TAUS = grid(BINS_PER_OCTAVE)
 BINS = len(FREQS)
-PAD_FRAMES = 120  # silence after the end, so circular wrap stays quiet
 FLOOR_DB = 45
 PHON = 80  # listening level for the equal-loudness contour
 LOUDNESS = 10 ** (gain_db(FREQS, PHON) / 20)  # weight each bin as loud as the ear hears it
@@ -39,14 +39,21 @@ def magnitude(samples, sample_rate, bins_per_octave=BINS_PER_OCTAVE):
 
     One FFT of the whole file feeds every bin: each bin filters a band of that
     spectrum with a gammatone, of order 4, t³·e^(-t/τ)·e^(iωt), folds it to the frame
-    grid, and an inverse FFT gives its envelope at every frame. The gammatone is
-    causal, like the cochlea: a bar lights at its note's attack and decays after.
+    grid, and an inverse FFT gives its envelope at every frame. Each envelope is
+    read LEAD·τ ahead, so an attack peaks on time: bass bins (τ up to 0.18 s at C1)
+    resolve semitones, and rise from the floor ahead of the attack and ring after.
     """
     freqs, taus = grid(bins_per_octave)
+    return filterbank(samples, sample_rate=sample_rate, freqs=freqs, taus=taus)
+
+
+def filterbank(samples, sample_rate, freqs, taus):
+    """Return (hop, linear): one gammatone of time constant taus[i] at each of freqs, see magnitude."""
     half_widths = BAND_EDGE / (2 * numpy.pi * taus)  # Hz, centre to band edge
     hop = round(sample_rate / FRAME_RATE)
     count = -(-len(samples) // hop)
-    total = 1 << int(numpy.ceil(numpy.log2(count + PAD_FRAMES)))
+    lead = numpy.round(LEAD * taus * FRAME_RATE).astype("int32")
+    total = 1 << int(numpy.ceil(numpy.log2(count + numpy.ceil(TAIL * taus.max() * FRAME_RATE))))
     logger.info("spectrogram: {samples} samples, FFT size {size}", samples=len(samples), size=total * hop)
     spectrum = numpy.fft.rfft(samples.astype("float32"), n=total * hop)
 
@@ -61,7 +68,8 @@ def magnitude(samples, sample_rate, bins_per_octave=BINS_PER_OCTAVE):
     response = squared * squared  # order 4
     band = spectrum[index.clip(0, len(spectrum) - 1)] * response
     folded = band.reshape(len(freqs), fold, total).sum(axis=1)
-    envelope = numpy.fft.ifft(folded, axis=1)[:, :count]
+    envelope = numpy.fft.ifft(folded, axis=1)
+    envelope = envelope[numpy.arange(len(freqs))[:, None], lead[:, None] + numpy.arange(count)]
     logger.info("spectrogram: {frames} frames done", frames=count)
     return hop, (numpy.abs(envelope) / (hop / 2)).T.astype("float32")
 
