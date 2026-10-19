@@ -115,6 +115,7 @@ const barStyles = barColors.map((color) => color.getStyle()); // for the unwound
 // Notes view: keys lit by the voice pass, not a held rectangle, are warm amber.
 const VOICE_COLOR = oklch(0.85, 0.14, (70 / 180) * Math.PI);
 const VOICE_STYLE = VOICE_COLOR.getStyle();
+const SHOW_VOICE = false; // TODO: show once the voice pass finds singing
 const voiced = new Uint8Array(BINS);
 // Wedge faces lie on fixed planes, so normals never change with length.
 geometry.computeVertexNormals();
@@ -310,7 +311,7 @@ renderer.setAnimationLoop(() => {
   const playing = source && t >= 0;
   const at = playing ? t * spectrogram.header.frame_rate : 0;
   const shown = playing && (view.value === "hits" ? spectrogram.hits : spectrogram.grids[0]);
-  const voice = playing && spectrogram.grids[1];
+  const voice = SHOW_VOICE && playing && spectrogram.grids[1];
   for (let bin = 0; bin < BINS; bin++) {
     const held = shown ? frameValue(shown, at, bin) : 0;
     const sung = voice ? frameValue(voice, at, bin) : 0;
