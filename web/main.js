@@ -13,13 +13,15 @@ const CHROMA = 0.12;
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const STRIP_SHARE = 0.25; // bottom of the window holds the unwound chart
+const spiralHeight = () => window.innerHeight * (1 - STRIP_SHARE);
+renderer.setSize(window.innerWidth, spiralHeight());
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0b12);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / spiralHeight(), 0.1, 100);
 const CENTRE = (TURN_HEIGHT * (BINS / 12 - 1)) / 2;
 const VIEW = new THREE.Vector3(0, 5, 11); // camera offset from the centre at zoom 1
 function zoom(factor) {
@@ -98,11 +100,13 @@ function shapeBar(bin, length) {
   });
 }
 
+const barStyles = []; // CSS colour per bin, for the unwound chart
 for (let bin = 0; bin < BINS; bin++) {
   shapeBar(bin, 1);
   const lightness = DARKEST + ((LIGHTEST - DARKEST) * bin) / (BINS - 1);
   const color = oklch(lightness, CHROMA, ((bin % 12) / 12) * Math.PI * 2);
   for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
+  barStyles.push(color.getStyle());
 }
 // Wedge faces lie on fixed planes, so normals never change with length.
 geometry.computeVertexNormals();
@@ -130,10 +134,43 @@ function label(text, angle) {
 }
 NOTE_NAMES.forEach((name, pitch) => label(name, angleOf(pitch)));
 
+// The spiral unwound: all bins left to right, C1 to B8.
+const strip = document.getElementById("strip");
+const stripContext = strip.getContext("2d");
+function sizeStrip() {
+  strip.width = window.innerWidth;
+  strip.height = window.innerHeight * STRIP_SHARE;
+}
+sizeStrip();
+const levels = new Float32Array(BINS);
+function drawStrip() {
+  const { width, height } = strip;
+  const barWidth = width / BINS;
+  const labelHeight = 14;
+  stripContext.clearRect(0, 0, width, height);
+  stripContext.font = "11px sans-serif";
+  stripContext.fillStyle = "#888";
+  stripContext.strokeStyle = "#333";
+  for (let octave = 0; octave < BINS / 12; octave++) {
+    const x = octave * 12 * barWidth;
+    stripContext.beginPath();
+    stripContext.moveTo(x, 0);
+    stripContext.lineTo(x, height);
+    stripContext.stroke();
+    stripContext.fillText(`C${octave + 1}`, x + 2, height - 2);
+  }
+  levels.forEach((level, bin) => {
+    const barHeight = level * (height - labelHeight);
+    stripContext.fillStyle = barStyles[bin];
+    stripContext.fillRect(bin * barWidth, height - labelHeight - barHeight, barWidth, barHeight);
+  });
+}
+
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = window.innerWidth / spiralHeight();
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(window.innerWidth, spiralHeight());
+  sizeStrip();
 });
 
 const info = document.getElementById("info");
@@ -190,11 +227,12 @@ renderer.setAnimationLoop(() => {
   // what the speaker plays now left the context outputLatency ago
   const t = audio.currentTime - startTime - (audio.outputLatency || 0);
   for (let bin = 0; bin < BINS; bin++) {
-    const level = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
-    shapeBar(bin, Math.max(level, 0.02) * MAX_LENGTH);
+    levels[bin] = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
+    shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
   }
   geometry.attributes.position.needsUpdate = true;
   renderer.render(scene, camera);
+  drawStrip();
 });
 
 document.getElementById("file").addEventListener("change", (event) => {
