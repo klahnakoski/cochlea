@@ -329,5 +329,6 @@ let shownView = serverView();
 view.addEventListener("change", () => {
   if (serverView() === shownView) return;
   shownView = serverView();
+  if (shownView === "top") suppress.checked = true; // top notes need overtones folded
   reanalyze();
 });
