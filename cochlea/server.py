@@ -60,7 +60,7 @@ def pack(samples, sample_rate, shape, view):
             "fmin": FMIN,
             "bins_per_octave": BINS_PER_OCTAVE,
             "bins": BINS,
-            "frames": len(frames),
+            "frames": len(levels),
             "duration": len(samples) / sample_rate,
             "drums": {"frame": hit_frames.tolist(), "level": hit_levels.round(3).tolist()},
             **fields,

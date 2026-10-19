@@ -7,8 +7,10 @@ a broad band are unknown and take no part in the fit, so rectangles run through 
 Ridges (rows topping their neighbours) are pooled per key, and each key's contrast is
 split into piecewise-constant runs by bottom-up merging with a fixed cost per run
 (a Potts fit), so noise does not pay for its own run. Runs that stand out are
-rectangles; one starting and ending with a lower one at a harmonic offset folds
-into it. Each surviving rectangle lights its key.
+rectangles; short ones chaining a key apart, as in a glide, share one run cost as
+a stroke. One starting and ending with a lower one at a harmonic offset folds
+into it. Each surviving rectangle lights its key. A second pass, with the held
+rectangles unknown and a lower level, catches the quieter voice in its own grid.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -29,12 +31,17 @@ CHUNK = 512  # frames per FFT batch
 THREADS = 8
 BEAT_REACH = 8  # frames each way: a stripe rises above the minimum within this
 BEAT_RISE = 0.06  # mean grey above that minimum, about 4 dB
+PEAK = 0.06  # grey above the band mean that marks a tone, not a beat
 BEAT_SPAN = 3 * ROWS_PER_SEMITONE  # rows each way averaged: notes are thin, beats broad
 BACKGROUND_SPAN = 6 * ROWS_PER_SEMITONE  # rows each way averaged as the local background
 MARGIN = 0.06  # grey above the background before a pixel counts
 RIDGE_SPAN = 2  # rows each way a ridge pixel must top
 PENALTY = 0.1  # squared error a run must explain to pay for itself
+STEP_PENALTY = 0.01  # squared error a step of a chained stroke must explain
+GAP = 2  # frames from one step's end to the next step's start
+SHORT = 9  # frames: runs longer than this are held tones, not steps
 LEVEL = 0.12  # mean contrast that makes a run a rectangle
+VOICE_LEVEL = 0.06  # the same on the voice pass
 TOGETHER = 4  # frames apart that an overtone may start or end
 
 
@@ -121,9 +128,13 @@ def running_min(grey, reach):
 
 
 def beats(grey):
-    """(ROWS, frames) bool: unknown pixels, rising above their time neighbourhood along with a broad band."""
+    """(ROWS, frames) bool: unknown pixels, rising above their time neighbourhood along with a broad band.
+
+    A pixel standing PEAK above its band is a tone, gliding or held through the beat, and stays known.
+    """
     band = box_mean(grey, BEAT_SPAN)
-    return (band - running_min(band, BEAT_REACH) > BEAT_RISE) & (grey - running_min(grey, BEAT_REACH) > BEAT_RISE)
+    rising = (band - running_min(band, BEAT_REACH) > BEAT_RISE) & (grey - running_min(grey, BEAT_REACH) > BEAT_RISE)
+    return rising & (grey - band < PEAK)
 
 
 def ridges(grey):
@@ -140,15 +151,90 @@ def ridges(grey):
     return numpy.where(top, contrast, 0)
 
 
-def fit(contrast, known):
+def merged(first, sums, frames, penalty, jitter):
+    """Runs after merging, each pass, every neighbouring pair whose merge raises the squared error least
+    among its neighbours and by under `penalty`; runs never cross a row start."""
+    while True:
+        w, s, _ = sums
+        mean = s / numpy.maximum(w, 1e-30)
+        cost = w[:-1] * w[1:] / numpy.maximum(w[:-1] + w[1:], 1e-30) * (mean[:-1] - mean[1:]) ** 2
+        cost = numpy.where(first[1:] % frames == 0, numpy.inf, cost + jitter[: cost.size])
+        edge = numpy.full(1, numpy.inf)
+        merge = (
+            (cost < penalty)
+            & (cost < numpy.concatenate([edge, cost[:-1]]))
+            & (cost < numpy.concatenate([cost[1:], edge]))
+        )
+        if not merge.any():
+            return first, sums
+        keep = numpy.concatenate([[True], ~merge])
+        run = numpy.cumsum(keep) - 1
+        sums = [numpy.bincount(run, weights=v) for v in sums]
+        first = first[keep]
+
+
+def bounds(first, end, chosen, known_pixel, frames):
+    """(start, last) pixel of each chosen run: its first and last known pixel, or up to a chosen neighbour."""
+    after_one = numpy.concatenate([[False], chosen[:-1]]) & (first % frames != 0)
+    before_one = numpy.concatenate([chosen[1:], [False]]) & (end % frames != 0)
+    start = numpy.where(
+        after_one, first, known_pixel[numpy.searchsorted(known_pixel, first).clip(max=known_pixel.size - 1)]
+    )
+    last = numpy.where(before_one, end - 1, known_pixel[numpy.searchsorted(known_pixel, end) - 1])
+    return start[chosen], last[chosen]
+
+
+def components(count, source, target):
+    """Component label (its lowest member) of each of `count` nodes joined by edges source -> target."""
+    label = numpy.arange(count)
+    ends = numpy.concatenate([source, target])
+    others = numpy.concatenate([target, source])
+    order = numpy.argsort(ends, kind="stable")
+    ends, others = ends[order], others[order]
+    group = numpy.flatnonzero(numpy.concatenate([[True], ends[1:] != ends[:-1]])) if ends.size else ends
+    while ends.size:
+        lowest = numpy.minimum.reduceat(label[others], group)
+        update = numpy.minimum(label[ends[group]], lowest)
+        if (update == label[ends[group]]).all():
+            break
+        label[ends[group]] = update
+        label = label[label]  # jump to the label's own label
+    return label
+
+
+def strokes(runs, frames):
+    """Stroke label per run: short runs one key apart, the next starting within GAP frames of the last ending."""
+    key, start, end = runs["key"], runs["start"], runs["end"]
+    short = end - start < SHORT
+    owner = numpy.bincount(key * frames + start, weights=numpy.arange(key.size) + 1, minlength=BINS * frames + 1)
+    owner -= numpy.bincount(key * frames + end + 1, weights=numpy.arange(key.size) + 1, minlength=BINS * frames + 1)
+    owner = numpy.round(numpy.cumsum(owner)[:-1]).astype(int).reshape(BINS, frames) - 1
+    near = (key[:, None, None] + numpy.array([-1, 1])[None, :, None]).repeat(GAP + 1, axis=2)
+    when = (end[:, None, None] + numpy.arange(GAP + 1)).repeat(2, axis=1)
+    inside = (near >= 0) & (near < BINS) & (when < frames)
+    next_run = numpy.where(inside, owner[near.clip(0, BINS - 1), when.clip(max=frames - 1)], -1)
+    source = numpy.broadcast_to(numpy.arange(key.size)[:, None, None], next_run.shape)
+    linked = (
+        (next_run >= 0)
+        & short[source]
+        & short[next_run]
+        & (start[next_run] >= end[:, None, None] - 1)
+        & (start[next_run] >= start[:, None, None])
+        & (end[next_run] >= end[:, None, None])
+    )
+    return components(key.size, source=source[linked], target=next_run[linked])
+
+
+def fit(contrast, known, level):
     """Rectangles fitted to `contrast` on the known pixels, as a dict of arrays.
 
     Each row is cut into runs, every pixel its own run except runs of zeros and of
-    unknowns; each pass merges every neighbouring pair whose merge raises the squared
-    error least among its neighbours and by under PENALTY. Runs with a mean of at least
-    LEVEL are rectangles: key (row), start and end (first and last known frame, or up to
-    the neighbouring rectangle when unknown frames lie between them), weight
-    (known pixels), total (summed contrast).
+    unknowns, merged under PENALTY. Runs with a mean of at least `level` are held.
+    Steps, the runs merged away that still stood out under STEP_PENALTY, join short
+    held runs in strokes; a stroke of two or more runs explaining PENALTY together
+    keeps its steps. Columns: key (row), start and end (first and last known frame,
+    or up to the neighbouring rectangle when unknown frames lie between them),
+    weight (known pixels), total (summed contrast), stroke (shared along a chain).
     """
     rows, frames = contrast.shape
     value = contrast.ravel().astype("float64")
@@ -161,39 +247,31 @@ def fit(contrast, known):
     first = numpy.flatnonzero(starts)
     sums = [numpy.bincount(run, weights=v) for v in (weight, weight * value, weight * value * value)]
     jitter = numpy.random.default_rng(0).random(first.size) * 1e-9  # breaks ties between equal costs
-    while True:
-        w, s, _ = sums
-        mean = s / numpy.maximum(w, 1e-30)
-        cost = w[:-1] * w[1:] / numpy.maximum(w[:-1] + w[1:], 1e-30) * (mean[:-1] - mean[1:]) ** 2
-        cost = numpy.where(first[1:] % frames == 0, numpy.inf, cost + jitter[: cost.size])
-        edge = numpy.full(1, numpy.inf)
-        merge = (
-            (cost < PENALTY)
-            & (cost < numpy.concatenate([edge, cost[:-1]]))
-            & (cost < numpy.concatenate([cost[1:], edge]))
-        )
-        if not merge.any():
-            break
-        keep = numpy.concatenate([[True], ~merge])
-        run = numpy.cumsum(keep) - 1
-        sums = [numpy.bincount(run, weights=v) for v in sums]
-        first = first[keep]
-    w, s, _ = sums
-    end = numpy.concatenate([first[1:], [value.size]])
-    rectangle = (w > 0) & (s >= LEVEL * w)
+    step_first, (step_w, step_s, step_ss) = merged(first, sums, frames=frames, penalty=STEP_PENALTY, jitter=jitter)
+    first, (w, s, _) = merged(step_first, [step_w, step_s, step_ss], frames=frames, penalty=PENALTY, jitter=jitter)
     known_pixel = numpy.flatnonzero(weight > 0)
-    after_one = numpy.concatenate([[False], rectangle[:-1]]) & (first % frames != 0)
-    before_one = numpy.concatenate([rectangle[1:], [False]]) & (end % frames != 0)
-    start = numpy.where(
-        after_one, first, known_pixel[numpy.searchsorted(known_pixel, first).clip(max=known_pixel.size - 1)]
-    )[rectangle]
-    last = numpy.where(before_one, end - 1, known_pixel[numpy.searchsorted(known_pixel, end) - 1])[rectangle]
+    held = (w > 0) & (s >= level * w)
+    held_start, held_last = bounds(first, numpy.concatenate([first[1:], [value.size]]), held, known_pixel, frames)
+    inside = numpy.searchsorted(first, step_first, side="right") - 1
+    step = (step_w > 0) & (step_s >= level * step_w) & ~held[inside]
+    step_start, step_last = bounds(
+        step_first, numpy.concatenate([step_first[1:], [value.size]]), step, known_pixel, frames
+    )
+
+    start = numpy.concatenate([held_start, step_start])
+    last = numpy.concatenate([held_last, step_last])
+    run_weight, run_total = numpy.concatenate([w[held], step_w[step]]), numpy.concatenate([s[held], step_s[step]])
+    label = strokes({"key": start // frames, "start": start % frames, "end": last % frames}, frames)
+    members = numpy.bincount(label, minlength=label.size)
+    explained = numpy.bincount(label, weights=run_total**2 / run_weight, minlength=label.size)
+    keep = (numpy.arange(label.size) < held.sum()) | ((members[label] >= 2) & (explained[label] >= PENALTY))
     return {
-        "key": start // frames,
-        "start": start % frames,
-        "end": last % frames,
-        "weight": w[rectangle],
-        "total": s[rectangle],
+        "key": start[keep] // frames,
+        "start": start[keep] % frames,
+        "end": last[keep] % frames,
+        "weight": run_weight[keep],
+        "total": run_total[keep],
+        "stroke": label[keep],
     }
 
 
@@ -236,12 +314,19 @@ def per_key(rows):
 
 
 def stages(samples, sample_rate, frames):
-    """Every step of the Notes view, by name: row images grey, known, contrast; key images; rectangles; keep."""
+    """Every step of the Notes view, by name: row images grey, known, contrast; key images; both passes.
+
+    The voice pass fits again at VOICE_LEVEL with the held rectangles unknown.
+    """
     grey = image(samples, sample_rate=sample_rate, frames=frames)
     known = ~beats(grey)
     contrast = ridges(grey)
+    key_contrast = per_key(contrast).max(axis=1)
     key_known = per_key(known).mean(axis=1) >= 0.5
-    rectangles = fit(per_key(contrast).max(axis=1), key_known)
+    rectangles = fit(key_contrast, key_known, level=LEVEL)
+    covered = painted(rectangles, frames=frames, level=numpy.ones(len(rectangles["key"]))) > 0
+    voice_known = key_known & ~covered
+    voice = fit(key_contrast, voice_known, level=VOICE_LEVEL)
     return {
         "grey": grey,
         "known": known,
@@ -250,14 +335,26 @@ def stages(samples, sample_rate, frames):
         "key_known": key_known,
         "rectangles": rectangles,
         "keep": ~folded(rectangles, frames=frames),
+        "covered": covered,
+        "voice_known": voice_known,
+        "voice": voice,
+        "voice_keep": ~folded(voice, frames=frames),
     }
 
 
+def shown(rectangles, keep, grey, known):
+    """(BINS, frames) display level of the kept rectangles: their mean grey on the FLOOR_DB scale."""
+    kept = {name: column[keep] for name, column in rectangles.items()}
+    level = loudness(kept, grey=grey, known=known)
+    display = ((level * IMAGE_FLOOR_DB - IMAGE_FLOOR_DB + FLOOR_DB) / FLOOR_DB).clip(0, 1)
+    return painted(kept, frames=grey.shape[1], level=display)
+
+
 def notes(levels, samples, sample_rate):
-    """Return (lit, header fields): `levels`-shaped display frames, each surviving rectangle lighting its key."""
+    """Return (lit, header fields): two `levels`-shaped grids stacked, held rectangles then the voice pass."""
     step = stages(samples, sample_rate=sample_rate, frames=len(levels))
-    kept = {name: column[step["keep"]] for name, column in step["rectangles"].items()}
-    grey = loudness(kept, grey=step["key_grey"], known=step["key_known"])
-    display = ((grey * IMAGE_FLOOR_DB - IMAGE_FLOOR_DB + FLOOR_DB) / FLOOR_DB).clip(0, 1)
-    lit = painted(kept, frames=len(levels), level=display).T.astype("float32")
-    return lit, {"rectangles": len(display)}
+    held = shown(step["rectangles"], keep=step["keep"], grey=step["key_grey"], known=step["key_known"])
+    voice = shown(step["voice"], keep=step["voice_keep"], grey=step["key_grey"], known=step["voice_known"])
+    voice = numpy.where(step["covered"], 0, voice)
+    lit = numpy.concatenate([held.T, voice.T]).astype("float32")
+    return lit, {"rectangles": int(step["keep"].sum()), "voice": int(step["voice_keep"].sum())}

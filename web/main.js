@@ -100,14 +100,22 @@ function shapeBar(bin, length) {
   });
 }
 
-const barStyles = []; // CSS colour per bin, for the unwound chart
+function colourBar(bin, color) {
+  for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
+}
+
+const barColors = []; // per bin
 for (let bin = 0; bin < BINS; bin++) {
   shapeBar(bin, 1);
   const lightness = DARKEST + ((LIGHTEST - DARKEST) * bin) / (BINS - 1);
-  const color = oklch(lightness, CHROMA, ((bin % 12) / 12) * Math.PI * 2);
-  for (let i = 0; i < CORNERS.length; i++) color.toArray(colors, (bin * CORNERS.length + i) * 3);
-  barStyles.push(color.getStyle());
+  barColors.push(oklch(lightness, CHROMA, ((bin % 12) / 12) * Math.PI * 2));
+  colourBar(bin, barColors[bin]);
 }
+const barStyles = barColors.map((color) => color.getStyle()); // for the unwound chart
+// Notes view: keys lit by the voice pass, not a held rectangle, are warm amber.
+const VOICE_COLOR = oklch(0.85, 0.14, (70 / 180) * Math.PI);
+const VOICE_STYLE = VOICE_COLOR.getStyle();
+const voiced = new Uint8Array(BINS);
 // Wedge faces lie on fixed planes, so normals never change with length.
 geometry.computeVertexNormals();
 const bars = new THREE.Mesh(
@@ -188,7 +196,7 @@ function drawStrip() {
   }
   levels.forEach((level, bin) => {
     const barHeight = level * (height - labelHeight);
-    stripContext.fillStyle = barStyles[bin];
+    stripContext.fillStyle = voiced[bin] ? VOICE_STYLE : barStyles[bin];
     stripContext.fillRect(bin * barWidth, height - labelHeight - barHeight, barWidth, barHeight);
   });
   stripContext.fillStyle = `rgba(255, 255, 255, ${flash})`;
@@ -231,8 +239,9 @@ function describe(file, header) {
   const seconds = Math.round(header.duration);
   const voices = header.voices ? ` — ${header.voices} voices` : "";
   const rectangles = header.rectangles ? ` — ${header.rectangles} rectangles` : "";
+  const voice = header.voice ? `, ${header.voice} in the voice pass` : "";
   const length = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  info.textContent = `${file.name} — ${length}${voices}${rectangles}`;
+  info.textContent = `${file.name} — ${length}${voices}${rectangles}${voice}`;
 }
 
 async function play(file) {
@@ -260,7 +269,8 @@ const BASS_DECAY_SECONDS = 0.5; // C1's decay; halves every two octaves up
 const SUSTAIN = 0.05; // held notes stay faintly visible
 const FILTER_CYCLES = 5.75; // the server's gammatone τ is this many periods (2.15 / 2π·semitone)
 function withHits(frames) {
-  const { header, data } = frames;
+  const { header } = frames;
+  const [data] = frames.grids;
   const { bins, frame_rate, fmin, bins_per_octave } = header;
   const octaves = Array.from({ length: bins }, (_, bin) => bin / bins_per_octave);
   const fades = octaves.map((octave) => Math.exp(-1 / (frame_rate * BASS_DECAY_SECONDS * 2 ** (-octave / 2))));
@@ -283,10 +293,9 @@ function withHits(frames) {
   return { ...frames, hits };
 }
 
-// Frame row at fractional position `at`, lerped between neighbours.
-function frameValue(at, bin) {
+// Frame row of `data` at fractional position `at`, lerped between neighbours.
+function frameValue(data, at, bin) {
   const { header } = spectrogram;
-  const data = view.value === "hits" ? spectrogram.hits : spectrogram.data;
   const last = header.frames - 1;
   const clamped = Math.min(Math.max(at, 0), last);
   const low = Math.floor(clamped);
@@ -298,9 +307,21 @@ function frameValue(at, bin) {
 renderer.setAnimationLoop(() => {
   // what the speaker plays now left the context outputLatency ago
   const t = audio.currentTime - startTime - (audio.outputLatency || 0);
+  const playing = source && t >= 0;
+  const at = playing ? t * spectrogram.header.frame_rate : 0;
+  const shown = playing && (view.value === "hits" ? spectrogram.hits : spectrogram.grids[0]);
+  const voice = playing && spectrogram.grids[1];
   for (let bin = 0; bin < BINS; bin++) {
-    levels[bin] = source && t >= 0 ? frameValue(t * spectrogram.header.frame_rate, bin) : 0;
+    const held = shown ? frameValue(shown, at, bin) : 0;
+    const sung = voice ? frameValue(voice, at, bin) : 0;
+    levels[bin] = Math.max(held, sung);
     shapeBar(bin, Math.max(levels[bin], 0.02) * MAX_LENGTH);
+    const isVoice = sung > held ? 1 : 0;
+    if (isVoice !== voiced[bin]) {
+      voiced[bin] = isVoice;
+      colourBar(bin, isVoice ? VOICE_COLOR : barColors[bin]);
+      geometry.attributes.color.needsUpdate = true;
+    }
   }
   geometry.attributes.position.needsUpdate = true;
   flash = source && t >= 0 ? flashAt(t) : 0;
