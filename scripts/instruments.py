@@ -15,43 +15,21 @@ import numpy
 import soundfile
 from mo_logs import logger
 
-from cochlea.harmonics import suppress
+from cochlea.harmonics import FMAX, STRIDE, lobe, stft, suppress
 from cochlea.loudness import gain_db
-from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, FRAME_RATE, FREQS, PHON, grid, magnitude, normalize
+from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, PHON, grid, magnitude, normalize
 from scripts.harmonics import CASES as TONE_CASES, PARTIALS, RATE, score, signal
 
-SECONDS_PER_WINDOW = 0.19  # 8192 points at 44.1 kHz, about 5.4 Hz per bin
-STRIDE = 3  # STFT hop, in display frames
 FIT = 36  # candidate pitches per octave
 LOWEST = 2 * FIT  # C3: no fundamental below
 HIGHEST = 7 * FIT  # C8: no fundamental at or above
 PITCHES = grid(FIT)[0][LOWEST:HIGHEST]
 HARMONICS = numpy.arange(1, 16)
-FMAX = FREQS[-1] * 2 ** (1 / 24)
 INSTRUMENTS = 6
 DRUMS = 3
 BUMPS_PER_OCTAVE = 3  # percussion atoms are smooth at this resolution
 LOUDEST_OVERTONE = 1  # times the fundamental
 EPS = 1e-9
-
-
-def stft(samples, sample_rate):
-    """(frames, bins) Hann-window magnitude below FMAX, centred every STRIDE display frames; and Hz per bin."""
-    size = 1 << round(numpy.log2(SECONDS_PER_WINDOW * sample_rate))
-    hop = round(sample_rate / FRAME_RATE) * STRIDE
-    count = -(-len(samples) // hop)
-    padded = numpy.pad(samples.astype("float32"), (size // 2, size))
-    windows = numpy.lib.stride_tricks.sliding_window_view(padded, size)[::hop][:count]
-    resolution = sample_rate / size
-    top = int(FMAX / resolution) + 2
-    spectrum = numpy.abs(numpy.fft.rfft(windows * numpy.hanning(size).astype("float32"), axis=1)[:, :top])
-    return spectrum / (size / 4), resolution
-
-
-def lobe(offset):
-    """Hann window's magnitude response, in bins from its centre; 1 at 0, 0.5 at 1, 0 from 2."""
-    near_one = numpy.isclose(numpy.abs(offset), 1)
-    return numpy.where(near_one, 0.5, numpy.abs(numpy.sinc(offset) / numpy.where(near_one, 1, 1 - offset**2)))
 
 
 def partials(bins, resolution):
@@ -232,7 +210,7 @@ CASES = {
 }
 METHODS = {
     "none": lambda samples, display: display,
-    "suppress": lambda samples, display: suppress(display),
+    "suppress": lambda samples, display: suppress(display, samples=samples, sample_rate=RATE),
     "comb": lambda samples, display: instruments(samples, RATE, display),
 }
 
@@ -274,7 +252,7 @@ def song(path):
     _, display = magnitude(mono, rate)
     spectrogram_seconds = time.monotonic() - start
     print("plain   ", octave_levels(normalize(display)))
-    print("suppress", octave_levels(normalize(suppress(display))))
+    print("suppress", octave_levels(normalize(suppress(display, samples=mono, sample_rate=rate))))
     start = time.monotonic()
     model = learn(mono, rate)
     levels = octave_levels(normalize(model.bars(display)))

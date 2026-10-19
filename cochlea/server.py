@@ -15,7 +15,7 @@ WEB = (File(__file__).parent.parent / "web").os_path
 
 app = Flask(__name__, static_folder=None)
 
-SUPPRESS = {"0": lambda linear: linear, "1": suppress}  # ?suppress= value -> magnitude filter
+SUPPRESS = {"0": lambda linear, samples, sample_rate: linear, "1": suppress}  # ?suppress= value -> magnitude filter
 
 
 def decode(data):
@@ -27,7 +27,7 @@ def decode(data):
 def pack(samples, sample_rate, shape):
     """Analyze mono samples into the /analyze wire format; `shape` filters linear magnitude."""
     hop, linear = magnitude(samples, sample_rate)
-    frames = normalize(shape(linear))
+    frames = normalize(shape(linear, samples=samples, sample_rate=sample_rate))
     header = (
         json
         .dumps({

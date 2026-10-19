@@ -28,9 +28,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 - After drums: peel instruments one at a time over the whole song. On the residual, group STFT peaks whose envelopes pulse together (modulation coherence in few-second windows, pooled over the song), take the strongest group as an instrument, subtract it, repeat
 - Find repeated drum samples (onsets, cluster 2D time-frequency patches, matched filter), subtract them from the audio, leaving the lyrical instruments (agent drums)
-- Suppress reads note salience from a harmonic comb on an 8192-point STFT above C3 (sharper than the display grid), keeping its AUDIBLE/CAP rules (agent comb-suppress)
 - Learn instruments from the whole song (scripts/instruments.py: harmonic-comb KL-NMF on an 8192-point STFT, fundamentals C3..B7 at 36/oct, Hann-lobe partials, 3 smooth unshifted percussion atoms, Wiener split of the display bars): not yet better than suppress. Learned curves still collapse to pure tones (song: one curve all-overtones 1.0, one 0.49, four pure), so overtones are explained as separate notes; synthetic false bars 0.4..1.0 vs suppress 0.06..0.3; song octave means barely change from plain; 39 s for the 300 s song (STFT matmuls 0.3 s each, BLAS dense beats numpy FFT). Next: stop curves collapsing (fewer or fixed curves, an overtone floor, or a pure-tone penalty), then cut iterations/bins for speed, before adding ?suppress=2
-- Suppression over-claims on bass-heavy music: on a dance track it cuts mean level in octaves C3..C7 from 0.22 to 0.04, so voice vanishes; bass/kick energy is taken as the fundamental of everything above
 - Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
 - Bass bins leak into the semitone above (bins 7.8 Hz apart, gammatone τ capped at 0.04 s): C3 lights C#3 at about 0.5
 

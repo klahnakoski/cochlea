@@ -100,11 +100,11 @@ CASES = {
     ],
 }
 METHODS = {
-    "none": lambda linear: linear,
-    "hps": hps,
-    "correlation": correlation,
-    "hps + corr veto": hybrid,
-    "hps cap .7": suppress,
+    "none": lambda linear, samples: linear,
+    "hps": lambda linear, samples: hps(linear),
+    "correlation": lambda linear, samples: correlation(linear),
+    "hps + corr veto": lambda linear, samples: hybrid(linear),
+    "suppress": lambda linear, samples: suppress(linear, samples=samples, sample_rate=RATE),
 }
 
 
@@ -122,8 +122,8 @@ def main():
     for name, notes in CASES.items():
         samples, truth = signal(notes)
         _, linear = magnitude(samples, RATE)
-        for method, suppress in METHODS.items():
-            recall, false, level = score(normalize(suppress(linear)), truth)
+        for method, shape in METHODS.items():
+            recall, false, level = score(normalize(shape(linear, samples)), truth)
             rows.append(f"{name:24} {method:16} recall {recall:5.2f}  false bars {false:5.2f}  note level {level:4.2f}")
     print("\n".join(rows))
 
