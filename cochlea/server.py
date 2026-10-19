@@ -10,7 +10,7 @@ from mo_logs import logger
 
 from cochlea.drums import kicks
 from cochlea.harmonics import suppress
-from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, magnitude, normalize
+from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, emphasize, magnitude, normalize
 from cochlea.voices import top
 
 WEB = (File(__file__).parent.parent / "web").os_path
@@ -36,9 +36,10 @@ def decode(data):
 
 def pack(samples, sample_rate, shape, view):
     """Analyze mono samples into the /analyze wire format; `shape` filters linear magnitude, `view` the levels."""
-    hop, linear = magnitude(samples, sample_rate)
-    levels = normalize(shape(linear, samples=samples, sample_rate=sample_rate))
-    frames, fields = view(levels, samples=samples, sample_rate=sample_rate)
+    music = emphasize(samples)  # kicks read the raw samples; everything else the tilted music
+    hop, linear = magnitude(music, sample_rate)
+    levels = normalize(shape(linear, samples=music, sample_rate=sample_rate))
+    frames, fields = view(levels, samples=music, sample_rate=sample_rate)
     hit_frames, hit_levels = kicks(samples, sample_rate)
     header = (
         json

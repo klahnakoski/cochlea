@@ -35,6 +35,11 @@ def spectrogram(samples, sample_rate):
     return hop, normalize(linear)
 
 
+def emphasize(samples):
+    """Tilt the music up 6 dB per octave (a first difference), so bass stops dominating."""
+    return numpy.diff(samples, prepend=samples[:1]).astype("float32")
+
+
 def magnitude(samples, sample_rate, bins_per_octave=BINS_PER_OCTAVE):
     """Return (hop, linear): linear is a (frames, bins) float32 magnitude array.
 
