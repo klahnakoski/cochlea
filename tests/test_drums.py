@@ -1,6 +1,6 @@
 import numpy
 
-from cochlea.drums import separate
+from cochlea.drums import kicks, separate
 
 RATE = 44100
 
@@ -25,3 +25,12 @@ def test_loop_hits_found_and_subtracted():
     found = numpy.abs(kit.time[:, None] - starts).min(axis=0) < 0.005 * RATE
     assert found.mean() > 0.9
     assert 10 * numpy.log10((residual**2).sum() / (samples**2).sum()) < -15
+
+
+def test_kick_loop_hits_within_one_frame():
+    samples, starts = loop()
+    frames, levels = kicks(samples, RATE)
+    expected = starts[: len(starts) // 2] // 735
+    assert len(frames) == len(expected)
+    assert numpy.abs(frames - expected).max() <= 1
+    assert levels.max() == 1 and levels.min() > 0.5

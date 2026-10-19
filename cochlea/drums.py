@@ -9,10 +9,18 @@ together, and subtracting the hits leaves the rest.
 """
 
 import numpy
+from numpy.lib.stride_tricks import sliding_window_view
 from mo_logs import logger
 
-from cochlea.spectrogram import magnitude
+from cochlea.spectrogram import FRAME_RATE, magnitude
 
+KICK_BAND = (30, 160)  # Hz
+KICK_WINDOW = 0.03  # seconds either side of a candidate hit
+KICK_GAP = 0.05  # a hit tops the rise within this
+KICK_RISE_DB = 6
+KICK_FALL_DB = 3  # the envelope falls this much...
+KICK_FALL_AFTER = (0.13, 0.23)  # ...this many seconds later
+KICK_RANGE_DB = 24  # level 0 this far below the loudest hit
 LEVEL_FLOOR_DB = 60  # below the file's peak, for flux and patches
 FLUX_SPREAD = 3  # frames each side an onset must top
 FLUX_BASELINE = 61  # frames in the moving median
@@ -296,3 +304,38 @@ def conjugate_gradient(operator, target):
         direction = residual + (new_size / size) * direction
         size = new_size
     return x
+
+
+def kicks(samples, sample_rate):
+    """Return (frames, levels): the display frame and 0..1 loudness of each kick, in time order."""
+    hop = round(sample_rate / FRAME_RATE)
+    divisors = numpy.arange(1, hop + 1)
+    factor = divisors[(hop % divisors == 0) & (hop // divisors >= 32)].max()
+    small = numpy.pad(samples, (0, -len(samples) % factor)).reshape(-1, factor).mean(axis=1)
+    rate = sample_rate / factor
+    spectrum = numpy.fft.fft(small)
+    freq = numpy.fft.fftfreq(len(small), 1 / rate)
+    spectrum[(freq < KICK_BAND[0]) | (freq > KICK_BAND[1])] = 0
+    power = numpy.abs(numpy.fft.ifft(spectrum)) ** 2
+
+    width = round(KICK_WINDOW * rate)
+    now, before = window_db(power, 0, width), window_db(power, -width, width)
+    rise = now - before
+    gap = round(KICK_GAP * rate)
+    around = sliding_window_view(numpy.pad(rise, gap, constant_values=-numpy.inf), 2 * gap + 1)
+    peak = (rise >= around[:, : gap + 1].max(axis=1)) & (rise > around[:, gap + 1 :].max(axis=1))  # last of a tie
+    top = sliding_window_view(numpy.pad(now, (0, gap), mode="edge"), gap)[: len(now)].max(axis=1)
+    late, later = (round(a * rate) for a in KICK_FALL_AFTER)
+    fall = top - window_db(power, late, later - late)
+    at = numpy.flatnonzero(peak & (rise >= KICK_RISE_DB) & (fall >= KICK_FALL_DB))
+    frames, first = numpy.unique((at + width // 2) * factor // hop, return_index=True)
+    loud = top[at[first]]
+    return frames, (1 + (loud - loud.max(initial=-numpy.inf)) / KICK_RANGE_DB).clip(0, 1)
+
+
+def window_db(power, start, length):
+    """Return the dB of mean power over [t+start, t+start+length) for every t."""
+    total = numpy.concatenate([[0], numpy.cumsum(power)])
+    t = numpy.arange(len(power)) + start
+    mean = (total[(t + length).clip(0, len(power))] - total[t.clip(0, len(power))]) / length
+    return 10 * numpy.log10(mean + 1e-9 * power.max() + 1e-30)
