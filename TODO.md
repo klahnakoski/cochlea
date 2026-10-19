@@ -9,8 +9,10 @@ length = magnitude. Analysis is testable on synthesized tones without HTTP.
 Wire format of POST /analyze (field `audio`), shared by stages 2 and 3: body is a
 little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
 frame_rate, fmin, bins_per_octave, bins, frames, duration, drums: {frame, level}}
-(drums: the display frame and 0..1 loudness of each kick), then frames × bins
-little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
+(drums: the display frame and 0..1 loudness of each kick; ?view=top adds voices,
+the instrument count tracked), then frames × bins little-endian float32, row-major,
+values 0..1. Query: suppress=0|1, view=energy|top (top keeps only the tracked
+voices' keys, the rest 0). Content-Type application/octet-stream.
 
 ## 4. Transport
 
@@ -19,7 +21,6 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## 5. Harmonic suppression
 
-- Top notes mode (agent top-notes): estimate how many instruments the song has, track that many comb-confirmed notes over time, light only those keys
 - Coherence fold (scripts/coherence.py, not in suppress): display-bar log envelopes at 60 fps, aligned for gammatone lag, band-passed 2.5..20 Hz, common motion removed, correlated in 3 s windows at overtone offsets. Synthetic voice with vibrato: false bars 5.9 -> 1.0..3.6. The song barely changes (lit bars C3..C7 1.94 -> 1.93) because its evidence is almost all shared onsets; counting onsets folds notes struck together (recall 0.75 -> 0.48). Next: tell common onset from one note (pool per bar pair over the song, or onset pitch glides), or a faster per-bar filterbank so low bars follow vibrato
 - After drums: peel instruments one at a time over the whole song. On the residual, group STFT peaks whose envelopes pulse together (modulation coherence in few-second windows, pooled over the song), take the strongest group as an instrument, subtract it, repeat
 - Drum subtraction (cochlea/drums.py, scripts/drums.py: flux onsets, k-means on 0.3 s patches, aligned-average waveform templates, whole-song matched filter, banded least-squares gains) is weak: clusters are drum combinations (kick+hat, kick+snare+hat, hat), templates catch the next hit's tail, and averaging leaks the melody into them. Synthetic melody SNR -6 -> +5 dB, residual at hits -8.5 dB; song: 4 drums, 3261 hits, residual at hits -4 dB, only C1 octave mean drops (0.17 -> 0.04), 25 s for 317 s. Joint template least squares (block-Toeplitz CG) and re-averaging over all hits both made it worse (periodic hits make long templates ill-posed). Next: templates shorter than the hit spacing, or subtract on the magnitude grid; decide how to show drums and the residual

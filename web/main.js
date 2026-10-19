@@ -204,6 +204,9 @@ window.addEventListener("resize", () => {
 
 const info = document.getElementById("info");
 const suppress = document.getElementById("suppress");
+const view = document.getElementById("view");
+// Hits derives from the energy frames in the page; Top notes is its own analysis
+const serverView = () => (view.value === "top" ? "top" : "energy");
 const audio = new AudioContext();
 let source = null;
 let startTime = 0;
@@ -218,9 +221,16 @@ function stop() {
 async function fetchFrames(file) {
   const form = new FormData();
   form.append("audio", file);
-  const response = await fetch(`/analyze?suppress=${suppress.checked ? 1 : 0}`, { method: "POST", body: form });
+  const query = `suppress=${suppress.checked ? 1 : 0}&view=${serverView()}`;
+  const response = await fetch(`/analyze?${query}`, { method: "POST", body: form });
   if (!response.ok) throw new Error(`analyze failed: ${response.status}`);
   return parseFrames(await response.arrayBuffer());
+}
+
+function describe(file, header) {
+  const seconds = Math.round(header.duration);
+  const voices = header.voices ? ` — ${header.voices} voices` : "";
+  info.textContent = `${file.name} — ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}${voices}`;
 }
 
 async function play(file) {
@@ -233,8 +243,7 @@ async function play(file) {
   await audio.resume();
   stop();
   spectrogram = withHits(frames);
-  const seconds = Math.round(frames.header.duration);
-  info.textContent = `${file.name} — ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  describe(file, frames.header);
   source = audio.createBufferSource();
   source.buffer = buffer;
   source.connect(audio.destination);
@@ -271,12 +280,11 @@ function withHits(frames) {
   }
   return { ...frames, hits };
 }
-const showHits = document.getElementById("hits");
 
 // Frame row at fractional position `at`, lerped between neighbours.
 function frameValue(at, bin) {
   const { header } = spectrogram;
-  const data = showHits.checked ? spectrogram.hits : spectrogram.data;
+  const data = view.value === "hits" ? spectrogram.hits : spectrogram.data;
   const last = header.frames - 1;
   const clamped = Math.min(Math.max(at, 0), last);
   const low = Math.floor(clamped);
@@ -305,12 +313,21 @@ document.getElementById("file").addEventListener("change", (event) => {
 });
 document.getElementById("stop").addEventListener("click", stop);
 // re-analyze the playing file; playback continues, frames swap when they arrive
-suppress.addEventListener("change", () => {
+function reanalyze() {
   if (!currentFile) return;
   const file = currentFile;
   fetchFrames(file)
     .then((frames) => {
-      if (file === currentFile) spectrogram = withHits(frames);
+      if (file !== currentFile) return;
+      spectrogram = withHits(frames);
+      describe(file, frames.header);
     })
     .catch((error) => (info.textContent = String(error)));
+}
+suppress.addEventListener("change", reanalyze);
+let shownView = serverView();
+view.addEventListener("change", () => {
+  if (serverView() === shownView) return;
+  shownView = serverView();
+  reanalyze();
 });

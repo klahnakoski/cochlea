@@ -95,3 +95,18 @@ def test_analyze_reports_kick_frames_and_levels(client):
     assert len(drums["frame"]) == 4 and len(drums["level"]) == 4
     assert [abs(f - (30 + 60 * i)) <= 1 for i, f in enumerate(drums["frame"])] == [True] * 4
     assert max(drums["level"]) == 1
+
+
+def test_analyze_top_reports_voices(client):
+    response = client.post("/analyze?view=top", data={"audio": (BytesIO(sine_wav(1)), "a.wav")})
+    (length,) = struct.unpack("<I", response.data[:4])
+    header = json.loads(response.data[4 : 4 + length])
+    assert 2 <= header["voices"] <= 8
+    frames = numpy.frombuffer(response.data[4 + length :], dtype="<f4").reshape(header["frames"], 96)
+    assert ((frames > 0).sum(axis=1) <= header["voices"]).all()
+    assert (frames[10:].argmax(axis=1) == 45).all()
+
+
+def test_analyze_rejects_unknown_view(client):
+    response = client.post("/analyze?view=hits", data={"audio": (BytesIO(sine_wav(1)), "a.wav")})
+    assert response.status_code == 400
