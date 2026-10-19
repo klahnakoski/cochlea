@@ -233,7 +233,8 @@ async function play(file) {
   await audio.resume();
   stop();
   spectrogram = withHits(frames);
-  info.textContent = JSON.stringify(frames.header, null, 2);
+  const seconds = Math.round(frames.header.duration);
+  info.textContent = `${file.name} — ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   source = audio.createBufferSource();
   source.buffer = buffer;
   source.connect(audio.destination);
