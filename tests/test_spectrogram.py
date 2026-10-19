@@ -1,6 +1,6 @@
 import numpy
 
-from cochlea.spectrogram import BINS, FLOOR_DB, FMIN, bars, emphasize, magnitude, spectrogram
+from cochlea.spectrogram import BINS, EMPHASIS_DB_PER_OCTAVE, FLOOR_DB, FMIN, bars, emphasize, magnitude, spectrogram
 
 RATE = 44100
 
@@ -93,11 +93,10 @@ def test_finer_grid_centres_each_bar_and_rejects_neighbours_alike():
     assert bars(fine, 36)[len(fine) // 2].argmax() == 45
 
 
-def test_emphasis_tilts_6_db_per_octave():
+def test_emphasis_tilts_by_its_db_per_octave():
     low, high = 110.0, 440.0
-    emphasized = emphasize(tone(low) + tone(high))
-    _, frames = spectrogram(emphasized, RATE)
-    plain = spectrogram(tone(low) + tone(high), RATE)[1]
-    middle, before = frames[len(frames) // 2] * FLOOR_DB, plain[len(plain) // 2] * FLOOR_DB
-    tilt = (middle[bin_of(high)] - middle[bin_of(low)]) - (before[bin_of(high)] - before[bin_of(low)])
-    assert abs(tilt - 12) < 1
+    _, linear = magnitude(tone(low, high), RATE)
+    middle = linear[len(linear) // 2]
+    tilted = emphasize(linear)[len(linear) // 2]
+    gain_db = 20 * numpy.log10(tilted / middle)
+    assert abs(gain_db[bin_of(high)] - gain_db[bin_of(low)] - 2 * EMPHASIS_DB_PER_OCTAVE) < 0.1

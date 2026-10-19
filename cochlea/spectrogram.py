@@ -35,9 +35,13 @@ def spectrogram(samples, sample_rate):
     return hop, normalize(linear)
 
 
-def emphasize(samples):
-    """Tilt the music up 6 dB per octave (a first difference), so bass stops dominating."""
-    return numpy.diff(samples, prepend=samples[:1]).astype("float32")
+EMPHASIS_DB_PER_OCTAVE = 3  # tilt the music up so bass stops dominating
+EMPHASIS = 10 ** (EMPHASIS_DB_PER_OCTAVE * numpy.arange(BINS) / BINS_PER_OCTAVE / 20)
+
+
+def emphasize(linear):
+    """Tilt (frames, BINS) magnitude up EMPHASIS_DB_PER_OCTAVE per octave."""
+    return (linear * EMPHASIS).astype("float32")
 
 
 def magnitude(samples, sample_rate, bins_per_octave=BINS_PER_OCTAVE):

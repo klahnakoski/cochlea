@@ -36,10 +36,9 @@ def decode(data):
 
 def pack(samples, sample_rate, shape, view):
     """Analyze mono samples into the /analyze wire format; `shape` filters linear magnitude, `view` the levels."""
-    music = emphasize(samples)  # kicks read the raw samples; everything else the tilted music
-    hop, linear = magnitude(music, sample_rate)
-    levels = normalize(shape(linear, samples=music, sample_rate=sample_rate))
-    frames, fields = view(levels, samples=music, sample_rate=sample_rate)
+    hop, linear = magnitude(samples, sample_rate)
+    levels = normalize(shape(emphasize(linear), samples=samples, sample_rate=sample_rate))
+    frames, fields = view(levels, samples=samples, sample_rate=sample_rate)
     hit_frames, hit_levels = kicks(samples, sample_rate)
     header = (
         json
