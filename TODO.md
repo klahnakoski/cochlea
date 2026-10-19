@@ -17,9 +17,6 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 - Play / pause / seek with a progress bar; file name and duration shown
 - Drop a file anywhere on the page as well as the picker
 
-## Crisper bars
-
-
 ## 5. Harmonic suppression
 
 - Coherence fold (scripts/coherence.py, not in suppress): display-bar log envelopes at 60 fps, aligned for gammatone lag, band-passed 2.5..20 Hz, common motion removed, correlated in 3 s windows at overtone offsets. Synthetic voice with vibrato: false bars 5.9 -> 1.0..3.6. The song barely changes (lit bars C3..C7 1.94 -> 1.93) because its evidence is almost all shared onsets; counting onsets folds notes struck together (recall 0.75 -> 0.48). Next: tell common onset from one note (pool per bar pair over the song, or onset pitch glides), or a faster per-bar filterbank so low bars follow vibrato
