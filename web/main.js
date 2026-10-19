@@ -246,8 +246,8 @@ async function play(file) {
 const HIT_RISE = 0.07; // level gain over RISE_FRAMES that counts as a note start (~3 dB)
 const RISE_FRAMES = 3; // attacks take a few frames to rise
 const HIT_GAP_SECONDS = 0.1; // vibrato must not retrigger a bar
-const HIT_DECAY_SECONDS = 0.3;
-const SUSTAIN = 0.25; // held notes stay faintly visible
+const HIT_DECAY_SECONDS = 0.15;
+const SUSTAIN = 0.1; // held notes stay faintly visible
 function withHits(frames) {
   const { header, data } = frames;
   const { bins, frame_rate } = header;
