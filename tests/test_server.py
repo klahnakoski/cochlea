@@ -42,6 +42,7 @@ def test_analyze_stereo(client):
         "bins": 96,
         "frames": 60,
         "duration": 1.0,
+        "drums": {"frame": [], "level": []},
     }
     values = numpy.frombuffer(body[4 + length :], dtype="<f4")
     assert values.size == 60 * 96
@@ -78,3 +79,19 @@ def test_decode_mono():
 
 def test_index_served(client):
     assert b"Cochlea" in client.get("/").data
+
+
+def test_analyze_reports_kick_frames_and_levels(client):
+    t = numpy.arange(round(0.3 * RATE)) / RATE
+    kick = numpy.sin(2 * numpy.pi * 50 * t) * numpy.exp(-t / 0.1)
+    wave = numpy.zeros(4 * RATE)
+    for second in range(4):
+        wave[second * RATE + RATE // 2 :][: len(t)] = kick
+    buffer = BytesIO()
+    soundfile.write(buffer, wave.astype("float32"), RATE, format="WAV")
+    response = client.post("/analyze", data={"audio": (BytesIO(buffer.getvalue()), "k.wav")})
+    (length,) = struct.unpack("<I", response.data[:4])
+    drums = json.loads(response.data[4 : 4 + length])["drums"]
+    assert len(drums["frame"]) == 4 and len(drums["level"]) == 4
+    assert [abs(f - (30 + 60 * i)) <= 1 for i, f in enumerate(drums["frame"])] == [True] * 4
+    assert max(drums["level"]) == 1

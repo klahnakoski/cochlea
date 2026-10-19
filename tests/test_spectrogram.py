@@ -42,24 +42,25 @@ def test_silence_is_zero():
     assert not frames.any()
 
 
-def test_bass_burst_stays_short():
-    samples = numpy.zeros(2 * RATE, dtype="float32")
-    burst = int(0.05 * RATE)
-    samples[RATE : RATE + burst] = numpy.sin(2 * numpy.pi * 55 * numpy.arange(burst) / RATE)
-    hop, frames = spectrogram(samples, RATE)
-    lit = numpy.flatnonzero(frames[:, bin_of(55)] > 0.5)
-    assert lit.min() >= RATE // hop
-    assert (lit.max() - lit.min()) * hop / RATE < 0.35
-
-
 def test_bar_lights_at_attack_and_fades_after():
-    for freq in (55, 262):
-        samples = numpy.zeros(3 * RATE, dtype="float32")
+    for freq, early, late in ((55, 0.35, 1.0), (262, 0.1, 0.5)):  # every bin is read 3τ ahead and rings 8τ
+        samples = numpy.zeros(4 * RATE, dtype="float32")
         samples[RATE : 2 * RATE] = numpy.sin(2 * numpy.pi * freq * numpy.arange(RATE) / RATE)
         hop, frames = spectrogram(samples, RATE)
         start, stop = RATE // hop, 2 * RATE // hop
-        assert frames[:start, bin_of(freq)].max() == 0, freq
-        assert frames[stop + round(0.5 * RATE / hop) :, bin_of(freq)].max() == 0, freq
+        assert frames[: start - round(early * RATE / hop), bin_of(freq)].max() == 0, freq
+        assert frames[stop + round(late * RATE / hop) :, bin_of(freq)].max() == 0, freq
+
+
+def test_bass_notes_light_their_bar_after_each_attack():
+    notes = ((65.406, 0.5), (73.416, 2.0))  # C2 then D2
+    samples = numpy.zeros(4 * RATE, dtype="float32")
+    t = numpy.arange(int(1.3 * RATE)) / RATE
+    for freq, start in notes:
+        samples[int(start * RATE) :][: len(t)] = numpy.sin(2 * numpy.pi * freq * t)
+    hop, frames = spectrogram(samples, RATE)
+    for freq, start in notes:
+        assert frames[round((start + 0.5) * RATE / hop)].argmax() == bin_of(freq), freq
 
 
 def test_equal_tones_follow_equal_loudness():
