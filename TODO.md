@@ -15,6 +15,10 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 - Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag tilts the top of the axis; tune bar scale in web/main.js (built by an agent with no browser)
 
+## Unwound chart
+
+- 2D strip at the bottom of the window: the 96 bars unwound in a line, same colours, spiral kept above
+
 ## 4. Transport
 
 - Play / pause / seek with a progress bar; file name and duration shown
