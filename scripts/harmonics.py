@@ -14,14 +14,16 @@ PARTIALS = numpy.arange(1, 11)
 LIT = 0.5
 
 
-def note(bin, start, stop, decay, tremolo=0.0, seconds=3.0, timbre=1 / PARTIALS):
-    """A harmonic tone at `bin`: partial h at timbre[h - 1], decaying faster as h rises."""
+def note(bin, start, stop, decay, tremolo=0.0, vibrato=0.0, rate=5.5, seconds=3.0, timbre=1 / PARTIALS):
+    """A harmonic tone at `bin`: partial h at timbre[h - 1], decaying faster as h rises; vibrato in semitones."""
     t = numpy.arange(int(seconds * RATE)) / RATE
+    pitch = FREQS[bin] * 2 ** (vibrato / 12 * numpy.sin(2 * numpy.pi * rate * t))
+    phase = 2 * numpy.pi * numpy.cumsum(pitch) / RATE
     age = t - start
     gate = numpy.clip(age / 0.01, 0, 1) * numpy.clip((stop - t) / 0.05, 0, 1)
     swell = 1 + tremolo * numpy.sin(2 * numpy.pi * 5 * t)
     decays = numpy.exp(-numpy.maximum(age, 0)[:, None] * numpy.sqrt(PARTIALS) / decay) if decay else 1
-    partials = numpy.sin(2 * numpy.pi * FREQS[bin] * PARTIALS * t[:, None]) * timbre * decays
+    partials = numpy.sin(phase[:, None] * PARTIALS) * timbre * decays
     return (gate * swell)[:, None] * partials
 
 
