@@ -26,7 +26,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## 5. Harmonic suppression
 
-- Learn instruments from the whole song (scripts/instruments.py, shift-invariant KL-NMF): beats suppress on synthesized mixes, but on the dance track the curves collapse to pure tones (one keeps octave 0.33) because peaks smear 0.4..0.75 into the neighbouring semitones, and it takes 9.6 s; try fitting on a de-smeared grid (36 bins per octave, or bass τ uncapped) before adding ?suppress=2 (agent instruments36)
+- Learn instruments from the whole song (scripts/instruments.py, shift-invariant KL-NMF fit on 36 bins per octave, loudness-weighted): C4 and up shows clear overtones at 36/oct, but octaves C1..B3 (bass, kick) stay smeared and non-harmonic even at 72/oct or with bass tau uncapped. So only one or two of six curves learn overtones, the rest are pure tones. Synthetic false bars (0.13..1.1) are still worse than suppress (0.03..0.59), and it takes 19 s. Next: give percussion/noise its own unshifted atoms, or fit curves only above C3, before adding ?suppress=2
 - Suppression over-claims on bass-heavy music: on a dance track it cuts mean level in octaves C3..C7 from 0.22 to 0.04, so voice vanishes; bass/kick energy is taken as the fundamental of everything above
 - Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
 - Bass bins leak into the semitone above (bins 7.8 Hz apart, gammatone τ capped at 0.04 s): C3 lights C#3 at about 0.5
