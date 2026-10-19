@@ -11,10 +11,6 @@ little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
 frame_rate, fmin, bins_per_octave, bins, frames, duration}, then frames × bins
 little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
 
-## 3. Spiral renderer
-
-- Open the page in a browser once: confirm Three.js loads from the CDN, the file plays, the helix tracks the music, drag tilts the top of the axis; tune bar scale in web/main.js (built by an agent with no browser)
-
 ## 4. Transport
 
 - Play / pause / seek with a progress bar; file name and duration shown
@@ -27,7 +23,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 ## 5. Harmonic suppression
 
 - After drums: peel instruments one at a time over the whole song. On the residual, group STFT peaks whose envelopes pulse together (modulation coherence in few-second windows, pooled over the song), take the strongest group as an instrument, subtract it, repeat
-- Find repeated drum samples (onsets, cluster 2D time-frequency patches, matched filter), subtract them from the audio, leaving the lyrical instruments (agent drums)
+- Drum subtraction (cochlea/drums.py, scripts/drums.py: flux onsets, k-means on 0.3 s patches, aligned-average waveform templates, whole-song matched filter, banded least-squares gains) is weak: clusters are drum combinations (kick+hat, kick+snare+hat, hat), templates catch the next hit's tail, and averaging leaks the melody into them. Synthetic melody SNR -6 -> +5 dB, residual at hits -8.5 dB; song: 4 drums, 3261 hits, residual at hits -4 dB, only C1 octave mean drops (0.17 -> 0.04), 25 s for 317 s. Joint template least squares (block-Toeplitz CG) and re-averaging over all hits both made it worse (periodic hits make long templates ill-posed). Next: templates shorter than the hit spacing, or subtract on the magnitude grid; decide how to show drums and the residual
 - Learn instruments from the whole song (scripts/instruments.py: harmonic-comb KL-NMF on an 8192-point STFT, fundamentals C3..B7 at 36/oct, Hann-lobe partials, 3 smooth unshifted percussion atoms, Wiener split of the display bars): not yet better than suppress. Learned curves still collapse to pure tones (song: one curve all-overtones 1.0, one 0.49, four pure), so overtones are explained as separate notes; synthetic false bars 0.4..1.0 vs suppress 0.06..0.3; song octave means barely change from plain; 39 s for the 300 s song (STFT matmuls 0.3 s each, BLAS dense beats numpy FFT). Next: stop curves collapsing (fewer or fixed curves, an overtone floor, or a pure-tone penalty), then cut iterations/bins for speed, before adding ?suppress=2
 - Try the suppress checkbox on real recordings: CAP (cochlea/harmonics.py) is tuned on synthesized 1/h rolloff; instruments with a weak fundamental keep overtones above 0.7 of it
 - Bass bins leak into the semitone above (bins 7.8 Hz apart, gammatone τ capped at 0.04 s): C3 lights C#3 at about 0.5
