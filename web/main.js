@@ -232,7 +232,7 @@ async function play(file) {
   ]);
   await audio.resume();
   stop();
-  spectrogram = frames;
+  spectrogram = withHits(frames);
   info.textContent = JSON.stringify(frames.header, null, 2);
   source = audio.createBufferSource();
   source.buffer = buffer;
@@ -241,9 +241,38 @@ async function play(file) {
   source.start(startTime);
 }
 
+// Hits view: a bar jumps when its note starts, then decays e^(-t/τ).
+const HIT_RISE = 0.07; // level gain over RISE_FRAMES that counts as a note start (~3 dB)
+const RISE_FRAMES = 3; // attacks take a few frames to rise
+const HIT_GAP_SECONDS = 0.1; // vibrato must not retrigger a bar
+const HIT_DECAY_SECONDS = 0.3;
+const SUSTAIN = 0.25; // held notes stay faintly visible
+function withHits(frames) {
+  const { header, data } = frames;
+  const { bins, frame_rate } = header;
+  const fade = Math.exp(-1 / (frame_rate * HIT_DECAY_SECONDS));
+  const gap = Math.round(HIT_GAP_SECONDS * frame_rate);
+  const hits = new Float32Array(data.length);
+  const lastHit = new Int32Array(bins).fill(-gap);
+  for (let frame = 0; frame < header.frames; frame++) {
+    for (let bin = 0; bin < bins; bin++) {
+      const i = frame * bins + bin;
+      const level = data[i];
+      const before = frame >= RISE_FRAMES ? data[i - RISE_FRAMES * bins] : 0;
+      const struck = level - before > HIT_RISE && frame - lastHit[bin] >= gap;
+      if (struck) lastHit[bin] = frame;
+      const decayed = frame ? hits[i - bins] * fade : 0;
+      hits[i] = Math.max(struck ? level : 0, decayed, SUSTAIN * level);
+    }
+  }
+  return { ...frames, hits };
+}
+const showHits = document.getElementById("hits");
+
 // Frame row at fractional position `at`, lerped between neighbours.
 function frameValue(at, bin) {
-  const { header, data } = spectrogram;
+  const { header } = spectrogram;
+  const data = showHits.checked ? spectrogram.hits : spectrogram.data;
   const last = header.frames - 1;
   const clamped = Math.min(Math.max(at, 0), last);
   const low = Math.floor(clamped);
@@ -277,7 +306,7 @@ suppress.addEventListener("change", () => {
   const file = currentFile;
   fetchFrames(file)
     .then((frames) => {
-      if (file === currentFile) spectrogram = frames;
+      if (file === currentFile) spectrogram = withHits(frames);
     })
     .catch((error) => (info.textContent = String(error)));
 });
