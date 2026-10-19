@@ -4,7 +4,7 @@ import { parseFrames } from "./frames.js";
 const BINS = 96;
 const TURN_HEIGHT = 1.2;
 const MAX_LENGTH = 4 * TURN_HEIGHT; // a bar at level 1/4 is a cube
-const RADIUS = TURN_HEIGHT / (2 * Math.sin(Math.PI / 12)); // inner face of each wedge is square
+const RADIUS = TURN_HEIGHT / (4 * Math.sin(Math.PI / 12)); // inner face of each wedge is 1 wide, 2 tall
 const LABEL_SIZE = 0.35;
 // Bar colours are OKLCH: lightness is perceptual, so equal steps look equal.
 const DARKEST = 0.4; // bass
