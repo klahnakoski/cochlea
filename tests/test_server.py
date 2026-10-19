@@ -124,10 +124,12 @@ def test_tracks_lists_and_serves_the_music_folder(client, tmp_path, monkeypatch)
     assert client.get("/tracks/b.wav").data == sine_wav(1)
 
 
-def test_analyze_notes_reports_rectangles(client):
+def test_analyze_notes_sends_held_then_voice_grid(client):
     response = client.post("/analyze?view=notes", data={"audio": (BytesIO(sine_wav(1)), "a.wav")})
     (length,) = struct.unpack("<I", response.data[:4])
     header = json.loads(response.data[4 : 4 + length])
     assert header["rectangles"] >= 1
-    frames = numpy.frombuffer(response.data[4 + length :], dtype="<f4").reshape(header["frames"], 96)
-    assert numpy.flatnonzero((frames[15:45] > 0).any(axis=0)).tolist() == [45]
+    assert header["voice"] >= 0
+    held, voice = numpy.frombuffer(response.data[4 + length :], dtype="<f4").reshape(2, header["frames"], 96)
+    assert numpy.flatnonzero((held[15:45] > 0).any(axis=0)).tolist() == [45]
+    assert (voice[:, 45][held[:, 45] > 0] == 0).all()

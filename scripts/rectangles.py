@@ -1,7 +1,8 @@
 """Chart the Notes view on test windows of a song, and time it on the whole song.
 
 Run from the repo root: python -m scripts.rectangles [song.wav [chart folder]]
-Writes charts/rect-<window>.png panels: image | beat mask | fitted rectangles | after overtone folding.
+Writes charts/rect-<window>.png panels: image | beat mask | fitted rectangles | after overtone folding;
+held rectangles white, the voice pass amber.
 """
 
 import struct
@@ -22,6 +23,8 @@ WINDOWS = {"0m00-0m06": (0, 6), "1m04-1m08": (64, 68), "2m53-3m00": (173, 180)} 
 MARGIN_SECONDS = 0.5  # read past each edge so the fit has context
 WIDE = 3  # chart pixels per frame
 TALL = 2  # chart pixels per row
+WHITE = numpy.array([1.0, 1.0, 1.0])
+AMBER = numpy.array([1.0, 0.7, 0.25])  # voice pass
 
 
 def drawn(rectangles, frames, level):
@@ -31,17 +34,18 @@ def drawn(rectangles, frames, level):
     return numpy.where(numpy.abs(inner)[:, None] <= filled * ROWS_PER_SEMITONE / 2, filled, 0)
 
 
-def picture(grey):
-    """Rows flipped so C1 is at the bottom, pixels enlarged, a dotted line under every C."""
-    pixels = (numpy.repeat(numpy.repeat(grey[::-1], TALL, axis=0), WIDE, axis=1) * 255).astype(numpy.uint8)
+def picture(grey, voice):
+    """RGB: `grey` white and `voice` amber, rows flipped so C1 is at the bottom, enlarged, a dotted line under every C."""
+    shade = numpy.maximum(grey[..., None] * WHITE, voice[..., None] * AMBER)
+    pixels = (numpy.repeat(numpy.repeat(shade[::-1], TALL, axis=0), WIDE, axis=1) * 255).astype(numpy.uint8)
     for octave in range(8):
         pixels[TALL * (ROWS - octave * 12 * ROWS_PER_SEMITONE) - 1, ::3] = 110
     return pixels
 
 
-def write_png(path, grey):
-    height, width = grey.shape
-    raw = b"".join(b"\x00" + numpy.repeat(grey[y, :, None], 3, axis=1).tobytes() for y in range(height))
+def write_png(path, rgb):
+    height, width, _ = rgb.shape
+    raw = b"".join(b"\x00" + rgb[y].tobytes() for y in range(height))
 
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
@@ -52,6 +56,12 @@ def write_png(path, grey):
     )
 
 
+def chained_strokes(rectangles, inside):
+    """Strokes of two or more rectangles among those `inside`."""
+    _, count = numpy.unique(rectangles["stroke"][inside], return_counts=True)
+    return (count >= 2).sum()
+
+
 def chart(song, output, name, first, last):
     rate = soundfile.info(song).samplerate
     begin = max(0, first - MARGIN_SECONDS)
@@ -60,34 +70,57 @@ def chart(song, output, name, first, last):
     )
     frames = -(-len(samples) // round(rate / FRAME_RATE))
     step = stages(samples.mean(axis=1), sample_rate=rate, frames=frames)
-    rectangles, keep = step["rectangles"], step["keep"]
-    kept = {key: column[keep] for key, column in rectangles.items()}
-    level = loudness(rectangles, grey=step["key_grey"], known=step["key_known"])
-    lit = painted(kept, frames=frames, level=level[keep]).T
     crop = slice(round((first - begin) * FRAME_RATE), round((last - begin) * FRAME_RATE))
-    inside = (rectangles["end"] >= crop.start) & (rectangles["start"] < crop.stop)
+    passes = {
+        "held": (step["rectangles"], step["keep"], step["key_known"]),
+        "voice": (step["voice"], step["voice_keep"], step["voice_known"]),
+    }
     contrast = per_key(step["contrast"]).max(axis=1)
-    explained = (rectangles["total"] ** 2 / rectangles["weight"]).sum() / (step["key_known"] * contrast**2).sum()
+    known_energy = (step["key_known"] * contrast**2).sum()
+    fitted, kept, stats = {}, {}, {}
+    for which, (rectangles, keep, known) in passes.items():
+        level = loudness(rectangles, grey=step["key_grey"], known=known)
+        fitted[which] = drawn(rectangles, frames=frames, level=level)
+        kept[which] = drawn({key: column[keep] for key, column in rectangles.items()}, frames=frames, level=level[keep])
+        inside = (rectangles["end"] >= crop.start) & (rectangles["start"] < crop.stop)
+        stats[which] = {
+            "fitted": inside.sum(),
+            "kept": (inside & keep).sum(),
+            "strokes": chained_strokes(rectangles, inside & keep),
+            "explained": (rectangles["total"] ** 2 / rectangles["weight"]).sum() / known_energy,
+        }
+    covered = numpy.repeat(step["covered"], ROWS_PER_SEMITONE, axis=0)
+    for drawing in (fitted, kept):
+        drawing["voice"] = numpy.where(covered, 0, drawing["voice"])
+    zero = numpy.zeros_like(step["grey"])
     panels = [
-        step["grey"],
-        numpy.where(step["known"], 0, step["grey"]),
-        drawn(rectangles, frames=frames, level=level),
-        drawn(kept, frames=frames, level=level[keep]),
+        (step["grey"], zero),
+        (numpy.where(step["known"], 0, step["grey"]), zero),
+        (fitted["held"], fitted["voice"]),
+        (kept["held"], kept["voice"]),
     ]
-    gap = numpy.full((TALL * ROWS, 6), 60, numpy.uint8)
-    joined = [part for panel in panels for part in (picture(panel[:, crop]), gap)][:-1]
+    gap = numpy.full((TALL * ROWS, 6, 3), 60, numpy.uint8)
+    joined = [part for grey, voice in panels for part in (picture(grey[:, crop], voice[:, crop]), gap)][:-1]
     path = output / f"rect-{name}.png"
     write_png(path.os_path, numpy.concatenate(joined, axis=1))
     seconds = last - first
+    keys = {which: (per_key(drawing[:, crop]).max(axis=1) > 0).sum(axis=0).mean() for which, drawing in kept.items()}
+    for which, stat in stats.items():
+        logger.info(
+            "{name} {which}: {fitted|round(digits=3)} rectangles/s fitted, {kept|round(digits=3)}/s after folding,"
+            " {strokes|round(digits=3)} chained strokes/s, {keys|round(digits=3)} keys lit per frame,"
+            " {explained|round(digits=3)} of known energy explained (whole read)",
+            name=name,
+            which=which,
+            fitted=stat["fitted"] / seconds,
+            kept=stat["kept"] / seconds,
+            strokes=stat["strokes"] / seconds,
+            keys=keys[which],
+            explained=stat["explained"],
+        )
     logger.info(
-        "{name}: {fitted|round(digits=3)} rectangles/s fitted, {kept|round(digits=3)}/s after folding,"
-        " {keys|round(digits=3)} keys lit per frame, {explained|round(digits=3)} of known energy explained"
-        " (whole read), {unknown|round(digits=3)} of pixels unknown -> {path}",
+        "{name}: {unknown|round(digits=3)} of pixels unknown -> {path}",
         name=name,
-        fitted=inside.sum() / seconds,
-        kept=(inside & keep).sum() / seconds,
-        keys=(lit[crop] > 0).sum(axis=1).mean(),
-        explained=explained,
         unknown=1 - step["known"][:, crop].mean(),
         path=path.os_path,
     )
@@ -101,16 +134,20 @@ def timing(song):
     image(samples, sample_rate=rate, frames=frames)
     imaged = time.monotonic()
     lit, fields = notes(numpy.zeros((frames, BINS)), samples=samples, sample_rate=rate)
+    held, voice = lit[:frames], lit[frames:]
     logger.info(
         "whole song {seconds|round(digits=3)}s: notes view {total|round(digits=3)}s, of which the image"
-        " {image|round(digits=3)}s; {rectangles} rectangles ({per|round(digits=3)}/s), {keys|round(digits=3)} keys"
-        " lit per frame",
+        " {image|round(digits=3)}s; {rectangles} held rectangles ({per|round(digits=3)}/s), {keys|round(digits=3)}"
+        " keys lit per frame; voice pass {voices} ({voice_per|round(digits=3)}/s), {voice_keys|round(digits=3)} keys",
         seconds=len(samples) / rate,
         total=time.monotonic() - imaged,
         image=imaged - start,
         rectangles=fields["rectangles"],
         per=fields["rectangles"] * rate / len(samples),
-        keys=(lit > 0).sum(axis=1).mean(),
+        keys=(held > 0).sum(axis=1).mean(),
+        voices=fields["voice"],
+        voice_per=fields["voice"] * rate / len(samples),
+        voice_keys=(voice > 0).sum(axis=1).mean(),
     )
 
 

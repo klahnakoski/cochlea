@@ -10,8 +10,10 @@ Wire format of POST /analyze (field `audio`), shared by stages 2 and 3: body is 
 little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
 frame_rate, fmin, bins_per_octave, bins, frames, duration, drums: {frame, level}}
 (drums: the display frame and 0..1 loudness of each kick; ?view=top adds voices,
-the instrument count tracked; ?view=notes adds rectangles, the count lit), then
-frames × bins little-endian float32, row-major, values 0..1. Query: suppress=0|1,
+the instrument count tracked; ?view=notes adds rectangles, the held count lit,
+and voice, the count lit by the second, quieter pass), then frames × bins
+little-endian float32, row-major, values 0..1; notes appends a second such grid,
+the voice pass's keys (0 under a held rectangle). Query: suppress=0|1,
 view=energy|top|notes (top keeps only the tracked voices' keys, the rest 0; notes
 lights each fitted rectangle's key at its loudness, the rest 0, ignoring suppress). Content-Type application/octet-stream.
 
@@ -22,9 +24,8 @@ lights each fitted rectangle's key at its loudness, the rest 0, ignoring suppres
 
 ## 5. Harmonic suppression
 
-- Voice in Notes (agent voice): chained short steps a semitone apart count as one stroke; second, looser pass on the residual after held-tone rectangles; colour second-pass rectangles differently
-- Notes view (cochlea/notes.py, scripts/rectangles.py -> charts/rect-*.png): the bass below C3 is mostly masked as beats on this song (kick stripes 14 frames apart leave few known pixels), and the steep top of a pitch slide is dropped (its 1-3 frame steps cannot pay PENALTY; try a cost scaled by length, or allow short steps that chain with a neighbour a semitone away); pad overtones rarely start and end within TOGETHER of their fundamental, so folding removes 10-25%; look at it in the browser
-- Notes bass (queued after agent voice; same file): below C3 skip the beat mask and fit big stubby rectangles to the pulsing bass, smear allowed
+- Notes view (cochlea/notes.py, scripts/rectangles.py -> charts/rect-*.png): the steepest top of the 2:53 slide (several keys per frame) has no ridge in the 1/4 s window and stays dark; held keys lit per frame rose 5-6 -> 9-10 once pixels standing PEAK above their band stay known through beats (bass now shows between kicks), check it is not clutter; the voice pass mostly finds quiet held tones, few gliding syllables; pad overtones rarely start and end within TOGETHER of their fundamental, so folding removes 10-25%; look at it in the browser
+- Notes bass (cochlea/notes.py): bass below C3 now shows only as dashes between kicks; fit big stubby rectangles to the pulsing bass, smear allowed
 - Coherence fold (scripts/coherence.py, not in suppress): display-bar log envelopes at 60 fps, aligned for gammatone lag, band-passed 2.5..20 Hz, common motion removed, correlated in 3 s windows at overtone offsets. Synthetic voice with vibrato: false bars 5.9 -> 1.0..3.6. The song barely changes (lit bars C3..C7 1.94 -> 1.93) because its evidence is almost all shared onsets; counting onsets folds notes struck together (recall 0.75 -> 0.48). Next: tell common onset from one note (pool per bar pair over the song, or onset pitch glides), or a faster per-bar filterbank so low bars follow vibrato
 - After drums: peel instruments one at a time over the whole song. On the residual, group STFT peaks whose envelopes pulse together (modulation coherence in few-second windows, pooled over the song), take the strongest group as an instrument, subtract it, repeat
 - Drum subtraction (cochlea/drums.py, scripts/drums.py: flux onsets, k-means on 0.3 s patches, aligned-average waveform templates, whole-song matched filter, banded least-squares gains) is weak: clusters are drum combinations (kick+hat, kick+snare+hat, hat), templates catch the next hit's tail, and averaging leaks the melody into them. Synthetic melody SNR -6 -> +5 dB, residual at hits -8.5 dB; song: 4 drums, 3261 hits, residual at hits -4 dB, only C1 octave mean drops (0.17 -> 0.04), 25 s for 317 s. Joint template least squares (block-Toeplitz CG) and re-averaging over all hits both made it worse (periodic hits make long templates ill-posed). Next: templates shorter than the hit spacing, or subtract on the magnitude grid; decide how to show drums and the residual
