@@ -8,7 +8,8 @@ length = magnitude. Analysis is testable on synthesized tones without HTTP.
 
 Wire format of POST /analyze (field `audio`), shared by stages 2 and 3: body is a
 little-endian uint32 N, then N bytes of UTF-8 JSON header {sample_rate, hop,
-frame_rate, fmin, bins_per_octave, bins, frames, duration}, then frames × bins
+frame_rate, fmin, bins_per_octave, bins, frames, duration, drums: {frame, level}}
+(drums: the display frame and 0..1 loudness of each kick), then frames × bins
 little-endian float32, row-major, values 0..1. Content-Type application/octet-stream.
 
 ## 4. Transport

@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 from mo_files import File
 from mo_logs import logger
 
+from cochlea.drums import kicks
 from cochlea.harmonics import suppress
 from cochlea.spectrogram import BINS, BINS_PER_OCTAVE, FMIN, magnitude, normalize
 
@@ -28,6 +29,7 @@ def pack(samples, sample_rate, shape):
     """Analyze mono samples into the /analyze wire format; `shape` filters linear magnitude."""
     hop, linear = magnitude(samples, sample_rate)
     frames = normalize(shape(linear, samples=samples, sample_rate=sample_rate))
+    hit_frames, hit_levels = kicks(samples, sample_rate)
     header = (
         json
         .dumps({
@@ -39,6 +41,7 @@ def pack(samples, sample_rate, shape):
             "bins": BINS,
             "frames": len(frames),
             "duration": len(samples) / sample_rate,
+            "drums": {"frame": hit_frames.tolist(), "level": hit_levels.round(3).tolist()},
         })
         .encode("utf-8")
     )
