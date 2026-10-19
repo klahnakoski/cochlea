@@ -1,6 +1,6 @@
 import numpy
 
-from cochlea.spectrogram import BINS, FLOOR_DB, FMIN, spectrogram
+from cochlea.spectrogram import BINS, FLOOR_DB, FMIN, bars, magnitude, spectrogram
 
 RATE = 44100
 
@@ -69,3 +69,15 @@ def test_equal_tones_follow_equal_loudness():
     bass_step = db[bin_of(c3)] - db[bin_of(c2)]
     mid_step = db[bin_of(c6)] - db[bin_of(c5)]
     assert bass_step > 5 and abs(mid_step) < 2
+
+
+def test_finer_grid_centres_each_bar_and_rejects_neighbours_alike():
+    _, coarse = magnitude(tone(440), RATE)
+    _, fine = magnitude(tone(440), RATE, bins_per_octave=36)
+    middle = fine[len(fine) // 2]
+    assert fine.shape[1] == 3 * BINS
+    assert middle.argmax() == 3 * 45 + 1
+    fine_neighbour = middle[3 * 45 + 2] / middle.max()
+    coarse_neighbour = coarse[len(coarse) // 2, 46] / coarse[len(coarse) // 2, 45]
+    assert abs(fine_neighbour - coarse_neighbour) < 0.2 * coarse_neighbour
+    assert bars(fine, 36)[len(fine) // 2].argmax() == 45
