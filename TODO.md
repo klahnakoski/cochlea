@@ -18,6 +18,7 @@ little-endian float32, row-major, values 0..1. Content-Type application/octet-st
 
 ## Crisper bars
 
+- Hits toggle (after bass-split merges): bar jumps on a note's onset (per-bar flux > a few dB), then decays e^-t/τ (τ ≈ 0.3 s), with a small sustain floor and ~0.1 s minimum gap per bar
 - With suppression on, bars drop too fast to see: give every bar a decay from its previous value
 
 ## 5. Harmonic suppression
